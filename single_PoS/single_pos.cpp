@@ -7,11 +7,13 @@ int main(int argc, char *argv[]) {
 
 		GRBModel model = GRBModel(env);
 
-		// Create variables
+		// Define variables
+		const double lowerBound = 0.001;
+		const double upperBound = GRB_INFINITY;
 
-		//double lb[] = {0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00};
-		double lb[] = {0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001};
-		double ub[] = {GRB_INFINITY, GRB_INFINITY, GRB_INFINITY, GRB_INFINITY, GRB_INFINITY, GRB_INFINITY, GRB_INFINITY, GRB_INFINITY};
+		// Create variables
+		double lb[] = {lowerBound, lowerBound, lowerBound, lowerBound, lowerBound, lowerBound, lowerBound, lowerBound};
+		double ub[] = {upperBound, upperBound, upperBound, upperBound, upperBound, upperBound, upperBound, upperBound};
 		GRBVar* vars = model.addVars(lb, ub, NULL, NULL, NULL, 8);
 
 		// Integrate new variables

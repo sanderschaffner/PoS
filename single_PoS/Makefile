@@ -8,7 +8,7 @@ all: single_pos
 
 run: run_single_pos
 
-single_pos : single_pos
+single_pos :
 	$(CPP) $(CARGS) -o single_pos single_pos.cpp -I$(INC) $(CPPLIB) -lpthread -lm
 
 run_single_pos: single_pos
