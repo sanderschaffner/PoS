@@ -65,6 +65,7 @@ public:
 	inline DataType& operator()(unsigned int ix, unsigned int iy) const
 	{
 		assert(ix<size[0]);
+		//std::cout << ix << ' ' << iy << ' ' << size[1] << std::endl ;
 		assert(iy<size[1]);
 		
 		return data[iy*size[0] + ix];
