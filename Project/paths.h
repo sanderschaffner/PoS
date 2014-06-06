@@ -109,9 +109,18 @@ public:
 			printf("\n");
 	    }*/
 
-		// go trough all paths and ensure that it exists:
-		for(int i = 0; i < paths_2.size(); i++){
-			
+		// go trough all paths and ensure that it is valid according to the graph:
+		// a: direct path: source->target
+		if(graph(source,target))
+		{
+			tmp2.clear();
+			tmp2.push_back(source);
+			tmp2.push_back(target);
+			paths.push_back(tmp2);
+		}
+		// b: indirect paths: source->xxx->target
+		for(int i = 0; i < paths_2.size(); i++)
+		{
 			tmp = paths_2[i];
 			temp = true;
 			for(int i = 0; i < tmp.size()+1; i++)
