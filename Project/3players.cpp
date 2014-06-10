@@ -141,20 +141,86 @@ int main(int argc, char *argv[]) {
 			// !! this is true here since we DECIDED that the direct way from source to target shall be our nash_path
 			// !! and the class Paths finds us this path first (if it exists in graph!)
 			for (int j = 1; j < paths[i].size(); j++){
-				cout << edge(i,i+3) << "    <    ";
+				//cout << edge(i,i+3) << "    <    ";
 				// go trough the edges of the path:
 				for (int k = 0; k < paths[i][j].size()-1; k++){
 					//edge we consider is paths[i][j][k],paths[i][j][k+1]
 					tmp_double = one/(used[paths[i][j][k]][paths[i][j][k+1]]+1);
 					temp_expr = temp_expr + tmp_double*v_edges[edge(paths[i][j][k],paths[i][j][k+1])];
-					cout << "  +  " << one/(used[paths[i][j][k]][paths[i][j][k+1]]+1) << " * " << edge(paths[i][j][k],paths[i][j][k+1]);
+					//cout << "  +  " << one/(used[paths[i][j][k]][paths[i][j][k+1]]+1) << " * " << edge(paths[i][j][k],paths[i][j][k+1]);
 				}
 				// add constraint: nesh_path < all possible alternatives
 				model.addConstr(v_edges[edge(i,i+3)] <= temp_expr);
-				cout<<"\n";
+				//cout<<"\n";
 				
 			}
 		}
+
+		// 5:
+		// Create used_profile: According to all possible combinations of paths for each player,
+		// we count how often each edge is visited, so that we have a look-up table for later.
+		int paths_pp[3] = {paths[0].size(),paths[1].size(),paths[2].size()}; // number of paths per person
+		int i0, i1, i2, k;
+		int profile = 0;
+		int mult_paths = paths_pp[0] * paths_pp[1] * paths_pp[2];
+		int used_profile[mult_paths][size][size];
+		memset(used_profile, 0, sizeof(used_profile));
+		int profile_path[3][mult_paths]; // connects profile and path -> pp[i][x] = y: for profile x we used path y of player i
+		vector<int> expensive;
+		for (i0 = 0; i0 < paths_pp[0]; i0++){
+			for (i1 = 0; i1 < paths_pp[1]; i1++){
+				for (i2 = 0; i2 < paths_pp[2]; i2++){
+					for (k=0;k<paths[0][i0].size()-1;k++){
+						used_profile[profile][paths[0][i0][k]][paths[0][i0][k+1]]++;
+						used_profile[profile][paths[0][i0][k+1]][paths[0][i0][k]]++;
+					}
+					for (k=0;k<paths[1][i1].size()-1;k++){
+						used_profile[profile][paths[1][i1][k]][paths[1][i1][k+1]]++;
+						used_profile[profile][paths[1][i1][k+1]][paths[1][i1][k]]++;
+					}
+					for (k=0;k<paths[2][i2].size()-1;k++){
+						used_profile[profile][paths[2][i2][k]][paths[2][i2][k+1]]++;
+						used_profile[profile][paths[2][i2][k+1]][paths[2][i2][k]]++;
+					}
+					// Print out one used_profile and the paths beloging to it
+					/*if (i0==1 && i1==1 && i2==1){
+						cout<<profile<<"\n";
+						for (int ii=0;ii<6;ii++){
+							for (int jj=0;jj<6;jj++)
+								cout<<used_profile[profile][ii][jj]<<" ";
+							cout<<"\n";
+						}
+						cout<<"path 0: ";
+						for(int bl=0; bl < paths[0][i0].size();bl++ )
+							cout<<paths[0][i0][bl];
+						cout<<endl<<"path 1: ";
+						for(int bl=0; bl < paths[1][i1].size();bl++ )
+							cout<<paths[1][i1][bl];
+						cout<<endl<<"path 2: ";
+						for(int bl=0; bl < paths[2][i1].size();bl++ )
+							cout<<paths[2][i2][bl];
+						cout<<endl;
+					}*/	
+					profile_path[0][profile] = i0;
+					profile_path[1][profile] = i1;
+					profile_path[2][profile] = i2;
+
+					// If the Nash-edges are part of the profile, we know for sure that: |S_i| >= |Nash| -> usefull later
+					if (used_profile[profile][0][3]>0 && used_profile[profile][1][4]>0 && used_profile[profile][2][5]>0)
+					{
+						expensive.push_back(profile);
+					}
+
+					profile++;
+				}
+			}
+		}
+		cout << "Expensive profiles: ";
+		for(int i = 0; i < expensive.size(); i++)
+		{
+			cout << expensive[i] <<" ";
+		}
+		cout << endl;
 
 	} catch(GRBException e) {
 		cout << "Error code = " << e.getErrorCode() << endl;
