@@ -28,11 +28,11 @@ int edge(int i, int j){
 		return 0;
 	else if (i==1 && j==2)
 		return 1;
-	else if (i==2 && j==3)
+	else if (i==2 && j==4)
 		return 2;
 	else if (i==3 && j==4)
 		return 3;
-	else if (i==4 && j==5)
+	else if (i==3 && j==5)
 		return 4;
 	else if (i==0 && j==3)
 		return 5;
@@ -70,16 +70,16 @@ int main(int argc, char *argv[]) {
 		//cout << "matrix: " << endl << graph << endl;
 		unsigned int graph[size][size];
 		memset(graph, 0, sizeof(graph));
-		graph[0][1] = 1; graph[1][2] = 1; graph[2][3] = 1; graph[3][4] = 1; graph[4][5] = 1;
-		graph[1][0] = 1; graph[2][1] = 1; graph[3][2] = 1; graph[4][3] = 1; graph[5][4] = 1;
+		graph[0][1] = 1; graph[1][2] = 1; graph[2][4] = 1; graph[3][4] = 1; graph[3][5] = 1;
+		graph[1][0] = 1; graph[2][1] = 1; graph[4][2] = 1; graph[4][3] = 1; graph[5][3] = 1;
 		graph[0][3] = 1; graph[1][4] = 1; graph[2][5] = 1;
 		graph[3][0] = 1; graph[4][1] = 1; graph[5][2] = 1;
 
 		// 2:
 		// Get all possible paths for each player in the graph
-		Paths paths_p1(0,3); // source, target, number of nodes in graph
-		Paths paths_p2(1,4); // source, target, number of nodes in graph
-		Paths paths_p3(2,5); // source, target, number of nodes in graph
+		Paths paths_p1(0,3); // source, target
+		Paths paths_p2(1,4); // source, target
+		Paths paths_p3(2,5); // source, target
 		paths_p1.getAllPaths(graph);
 		paths_p2.getAllPaths(graph);
 		paths_p3.getAllPaths(graph);
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
 		
 		// Create variables
 		// var_number: note x -> node y
-		// short, direct ones: 0: 0<->1, 1: 1<->2, 2: 2<->3, 3: 3<->4, 4: 4<->5
+		// short, direct ones: 0: 0<->1, 1: 1<->2, 2: 2<->4, 3: 3<->4, 4: 3<->5
 		// direct from source to target: 5: 0<->3, 6: 1<->4, 7: 2<->5
 		double lb[n_variables];
 		fill_n(lb, n_variables, lowerBound);
@@ -109,27 +109,27 @@ int main(int argc, char *argv[]) {
 		model.update();
 
 		// 3:
-		// Inequalities saying that the minimum spanning tree is the line (optimum=={0to1to2to3to4to5})
+		// Inequalities saying that the minimum spanning tree is the line (optimum=={0to1to2to4to3to5})
 		// So direct source to target paths have to be bigger than short ones
 		model.addConstr(v_edges[edge(0,1)] <= v_edges[edge(0,3)]);
 		model.addConstr(v_edges[edge(1,2)] <= v_edges[edge(0,3)]);
-		model.addConstr(v_edges[edge(2,3)] <= v_edges[edge(0,3)]);
+		model.addConstr(v_edges[edge(2,4)] <= v_edges[edge(0,3)]);
+		model.addConstr(v_edges[edge(3,4)] <= v_edges[edge(0,3)]);
 		model.addConstr(v_edges[edge(1,2)] <= v_edges[edge(1,4)]);
-		model.addConstr(v_edges[edge(2,3)] <= v_edges[edge(1,4)]);
-		model.addConstr(v_edges[edge(3,4)] <= v_edges[edge(1,4)]);
-		model.addConstr(v_edges[edge(2,3)] <= v_edges[edge(2,5)]);
+		model.addConstr(v_edges[edge(2,4)] <= v_edges[edge(1,4)]);
+		model.addConstr(v_edges[edge(2,4)] <= v_edges[edge(2,5)]);
 		model.addConstr(v_edges[edge(3,4)] <= v_edges[edge(2,5)]);
-		model.addConstr(v_edges[edge(4,5)] <= v_edges[edge(2,5)]);
+		model.addConstr(v_edges[edge(3,5)] <= v_edges[edge(2,5)]);
 		// Cost of the spanning tree is 1 (optimum has cost one -> result of lp gives directly PoS)
-		GRBLinExpr cost_p1_opt = v_edges[edge(0,1)] + v_edges[edge(1,2)]/2 + v_edges[edge(2,3)]/3;
-		GRBLinExpr cost_p2_opt = v_edges[edge(1,2)]/2 + v_edges[edge(2,3)]/3 + v_edges[edge(3,4)]/2;
-		GRBLinExpr cost_p3_opt = v_edges[edge(2,3)]/3 + v_edges[edge(3,4)]/2 + v_edges[edge(4,5)];
-		model.addConstr(cost_p1_opt + cost_p2_opt + cost_p3_opt == 1);
+		GRBLinExpr cost_p1_opt = v_edges[edge(0,1)] + v_edges[edge(1,2)]/2 + v_edges[edge(2,4)]/3;
+		GRBLinExpr cost_p2_opt = v_edges[edge(1,2)]/2 + v_edges[edge(2,4)]/3 + v_edges[edge(3,4)]/2;
+		GRBLinExpr cost_p3_opt = v_edges[edge(2,4)]/3 + v_edges[edge(3,4)]/2 + v_edges[edge(3,5)];
+		model.addConstr(cost_p1_opt + cost_p2_opt + cost_p3_opt == 1); // equivalent to: c1+...+c5==1
 
 		// 4:
 		// Inequalities checking that the edges (0,3) (1,4) and (2,5) give a Nash equilibrium
 		bool used[6][6];
-		double one = 50;
+		double one = 1;
 		memset(used, 0, sizeof(used));
 		used[0][3] = used[3][0] = used[1][4] = used[4][1] = used[2][5] = used[5][2] = 1; // used paths in nash
 		double tmp_double;
@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
 				for (int k = 0; k < paths[i][j].size()-1; k++){
 					//edge we consider is paths[i][j][k],paths[i][j][k+1]
 					tmp_double = one/(used[paths[i][j][k]][paths[i][j][k+1]]+1);
-					temp_expr = temp_expr + tmp_double*v_edges[edge(0,3)];
+					temp_expr = temp_expr + tmp_double*v_edges[edge(paths[i][j][k],paths[i][j][k+1])];
 					cout << "  +  " << one/(used[paths[i][j][k]][paths[i][j][k+1]]+1) << " * " << edge(paths[i][j][k],paths[i][j][k+1]);
 				}
 				// add constraint: nesh_path < all possible alternatives
