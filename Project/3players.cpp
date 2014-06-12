@@ -128,30 +128,30 @@ int main(int argc, char *argv[]) {
 
 		// 4:
 		// Inequalities checking that the edges (0,3) (1,4) and (2,5) give a Nash equilibrium
-		bool used[6][6];
+		int used[size][size];
 		double one = 1;
 		memset(used, 0, sizeof(used));
 		used[0][3] = used[3][0] = used[1][4] = used[4][1] = used[2][5] = used[5][2] = 1; // used paths in nash
 		double tmp_double;
 		// go trough all players:
 		for (int i = 0; i < 3; i++){
-			GRBLinExpr temp_expr;
 			// consider each path for this player:
 			// !! attention: we start with j==1 since we know that in paths[i][0][k] we have the nash_path
 			// !! this is true here since we DECIDED that the direct way from source to target shall be our nash_path
 			// !! and the class Paths finds us this path first (if it exists in graph!)
 			for (int j = 1; j < paths[i].size(); j++){
-				//cout << edge(i,i+3) << "    <    ";
+				cout << edge(i,i+3) << "    <    ";
+				GRBLinExpr temp_expr;
 				// go trough the edges of the path:
 				for (int k = 0; k < paths[i][j].size()-1; k++){
 					//edge we consider is paths[i][j][k],paths[i][j][k+1]
 					tmp_double = one/(used[paths[i][j][k]][paths[i][j][k+1]]+1);
 					temp_expr = temp_expr + tmp_double*v_edges[edge(paths[i][j][k],paths[i][j][k+1])];
-					//cout << "  +  " << one/(used[paths[i][j][k]][paths[i][j][k+1]]+1) << " * " << edge(paths[i][j][k],paths[i][j][k+1]);
+					cout << "  +  " << one/(used[paths[i][j][k]][paths[i][j][k+1]]+1) << " * " << edge(paths[i][j][k],paths[i][j][k+1]);
 				}
 				// add constraint: nesh_path < all possible alternatives
 				model.addConstr(v_edges[edge(i,i+3)] <= temp_expr);
-				//cout<<"\n";
+				cout<<"\n";
 				
 			}
 		}
@@ -215,12 +215,120 @@ int main(int argc, char *argv[]) {
 				}
 			}
 		}
-		cout << "Expensive profiles: ";
+		/*cout << "Expensive profiles: ";
 		for(int i = 0; i < expensive.size(); i++)
 		{
 			cout << expensive[i] <<" ";
 		}
 		cout << endl;
+		cout << "profile_path[x]: ";
+		for(int i = 0; i < 125; i++)
+		{
+			cout << profile_path[0][i] <<" ";
+		}
+		cout << endl;*/
+
+		// 6:
+		// Till now we have that |N| is Nash and direct line is min. But |N| is not yet min |N|
+		// We have to go trough all possible profiles and ensure that they are either bigger than |N| or are NOT Nash
+		// Therefore: Solve lp for each profile and preceed according to two situations:
+		// i: |S_i| >= |N| -> We are already happy -> Save result, proceed to next S_i
+		// ii: |S_i| < |N| -> Constraint is violated! |N| should be smallest Nash -> Add constraint s.t. one player wants to deviate and proceed recursively
+		// Goal: We want to constrain the lp s.t. |N| is smallest Nash and all other |S_i| are either bigger than |N| or NOT Nash. We therefore maximize |N|
+
+		// set objective: maximize Nash (yet not minimal Nash):
+		model.setObjective( v_edges[edge(0,3)] + v_edges[edge(1,4)] + v_edges[edge(2,5)] , GRB_MAXIMIZE);
+
+		// Optimize model and look at result -> not yet min Nash
+		model.optimize();
+		for (int i = 0; i < n_variables; i++) {
+			cout << v_edges[i].get(GRB_StringAttr_VarName) << " "
+		     << v_edges[i].get(GRB_DoubleAttr_X) << endl;
+		}
+		cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
+
+		// 6.1:
+		// learning from paper example:
+		// go trough all profiles and decide if it is worth to have a closer look according to the exaple out of the paper
+		// if in the new strategie the costs increas according to paper_costs (an therefore diff is pos) we won't consider it
+		const double paper_costs[8] = {113,277,418,318,0,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
+		const double paper_nash = paper_costs[edge(0,3)] + paper_costs[edge(1,4)] + paper_costs[edge(2,5)];
+		double diff = 0; // difference 
+		int pr; // profile number which we are looking at
+		vector <int> which_guy[mult_paths], which_strategy[mult_paths]; // guy and strategy we save after some tests
+		int heavy_profile[mult_paths];
+		memset(heavy_profile, 0, sizeof(heavy_profile));
+		// go trough all profiles
+		for (pr = 1; pr < mult_paths; pr++){
+			// go trough all players
+			for (int i = 0; i < 3; i++){
+				// i-th guy wants to deviate
+				for (int j = 0; j < paths_pp[i]; j++){
+					// to the j-th strategy
+					// therefore the path used in this profile (== profile_path[i][pr]) should not be j itself (else we have no change!)
+					if (j != profile_path[i][pr]){
+						// go trough whole used[][] and make a copy of the previous used_profile we already have computed
+						for (int ii = 0; ii < size; ii++)
+							for (int jj = 0; jj < size; jj++)
+								used[ii][jj] = used_profile[pr][ii][jj];
+						int t = profile_path[i][pr]; // path of i-th player in strategy pr which was considered and shall be changed!
+						diff = 0;
+						// now subtract from used t = profile_path[i][pr] (old) strategy and insert j-th (new) strategy instead
+						for (k = 0; k < paths[i][t].size() - 1; k++){
+							// subtract from diff all edge-costs of path t and weight it apropriate
+							diff -= paper_costs[edge(paths[i][t][k],paths[i][t][k+1])] / used[paths[i][t][k]][paths[i][t][k+1]];
+							// get ridd of path t in used
+							used[paths[i][t][k]][paths[i][t][k+1]]--;
+							used[paths[i][t][k+1]][paths[i][t][k]]--;
+						}
+						/*if (pr==31){
+							cout << "Diff of profile = " << pr << " before adding: " << diff << endl;
+						}*/
+						// and now insert the new 
+						for (k = 0; k < paths[i][j].size() - 1; k++){
+							// FIRST update used
+							used[paths[i][j][k]][paths[i][j][k+1]]++;
+							used[paths[i][j][k+1]][paths[i][j][k]]++;
+							// and then add costs
+							diff += paper_costs[edge(paths[i][j][k],paths[i][j][k+1])] / used[paths[i][j][k]][paths[i][j][k+1]];					
+						}
+
+						// if difference is negative we save person and profile number! 
+						if (diff < 0){
+							if (pr > 0)
+								//cout << "Profile = " << pr << ".  " << i << " guy wants to change to " << j << "-th strategy  " << "and diff is " << diff << endl;
+							which_guy[pr].push_back(i);
+							which_strategy[pr].push_back(j);
+						}					
+					}
+				}
+			}
+
+			diff = paper_nash;
+			// go trough used_profile which has not changed!
+			for (int i = 0; i < size; i++)
+				for (int j = i + 1; j < size; j++){
+					// subtract all costs of the proposed profile from Nash
+					if (used_profile[pr][i][j] > 0)
+						diff -= paper_costs[edge(i,j)];
+				}
+			if ( diff < 0) 
+			{
+				// Nash is smaller than proposed edges of profile
+				//cout << pr <<"-th strategy profile is sligtly heavier than Nash and the difference is "<< diff << endl;
+				heavy_profile[pr] = 1;
+			}
+		}
+		cout << "We found " << which_strategy[pr].size() << " changes we want to have a closer look on" << endl;
+
+		// 6.2
+		// Add constraints and solve each time lp. Do this recurivly and use data from which we learnd so far:
+		bool dont_proceed;
+/*	srand(time(NULL));
+	cout<<"vaa\n";
+	d = 0;
+	rec(1,constraint);
+	cout<<"sgsgsg\n";*/
 
 	} catch(GRBException e) {
 		cout << "Error code = " << e.getErrorCode() << endl;
