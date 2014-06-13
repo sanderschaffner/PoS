@@ -45,6 +45,99 @@ int edge(int i, int j){
 		return -1; // gives segfault bc array[-1] doesnt exist
 }
 
+void rec(int pr, bool dont_proceed, int mult_paths, GRBModel& model, GRBVar* v_edges, const int used_profile[125][6][6], const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile) {
+	if (pr == mult_paths) {
+		dont_proceed = false;
+		//cout << "gagaia simon amas rato ar beWdav?  " << lp_s << "\n";
+		return;
+	}
+
+	// profile pr is not a Nash equilibrium
+	// one of the guys wants to change the strategy
+	// cout<< pr< < "\n";
+	int i,j,k;
+	int used[6][6];
+	memset(used,0,sizeof(used));
+	int coef[8];
+	int rr = rand()%2;
+	GRBLinExpr path;
+	if (heavy_profile[pr] && rr){
+		memset(coef, 0, sizeof(coef));
+		coef[edge(0,3)] = coef[edge(1,4)] = coef[edge(2,5)] = 1; // start with nash
+		for (i=0;i<6;i++){
+			for (j=i+1;j<6;j++){
+				if (used_profile[pr][i][j]>0) coef[edge(i,j)]-=1;
+			}
+		}
+		// print profile and coeffs:
+		/*cout<<pr<<"\n";
+		for (int ii=0;ii<6;ii++){
+			for (int jj=0;jj<6;jj++)
+				cout<<used_profile[pr][ii][jj]<<" ";
+			cout<<"\n";
+		}
+		for (int jj=0;jj<8;jj++)
+			cout<<coef[jj]<<" ";
+		cout<<"\n";*/
+		for (k=0;k<8;k++){
+			if(coef[k]!=0) path = path + v_edges[k]/coef[k];
+		}
+		GRBConstr constr = model.addConstr(path <= 0);
+		model.optimize();
+		/*for (int i = 0; i < 8; i++) {
+			cout << v_edges[i].get(GRB_StringAttr_VarName) << " "
+		     << v_edges[i].get(GRB_DoubleAttr_X) << endl;
+		}
+		cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;*/
+
+		if (dont_proceed) return;
+		if (model.get(GRB_DoubleAttr_ObjVal)>1.574)
+			rec(i, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+		if (dont_proceed) return;
+		// delete added constr:
+		model.remove(constr);
+		return;
+	}
+/*	int tt = rand()%which_guy[pr].size();		
+	//for (int tt=0;tt<which_guy[pr].size();tt++){
+		i = which_guy[pr][tt];
+		j = which_strategy[pr][tt];
+		//cout<<pr<<"  "<<i<<"  "<<j<<"\n"; 
+		for (int ii=0;ii<6;ii++)
+			for (int jj=0;jj<6;jj++)
+				used[ii][jj] = used_profile[pr][ii][jj];
+		int t = pp[i][pr];
+		memset(coef, 0, sizeof(coef));
+		//now subtract from used pp[i][pr] strategy and insert j-th strategy instead
+		for (k=0;k<paths[i][t].size()-1;k++){
+			coef[edge(paths[i][t][k],paths[i][t][k+1])] = -one/used[paths[i][t][k]][paths[i][t][k+1]];
+			used[paths[i][t][k]][paths[i][t][k+1]]--;
+			used[paths[i][t][k+1]][paths[i][t][k]]--;
+		}
+		//and now insert the new 
+		for (k=0;k<paths[i][j].size()-1;k++){
+			used[paths[i][j][k]][paths[i][j][k+1]]++;
+			used[paths[i][j][k+1]][paths[i][j][k]]++;
+			coef[edge(paths[i][j][k],paths[i][j][k+1])] += one/used[paths[i][j][k]][paths[i][j][k+1]];					
+		}
+		for (k=0;k<8;k++) {lp.set_a(k, constraint, coef[k]);}
+		//cout<<"\n";
+		lp.set_b(constraint, zero);
+		//cout<<pr<<"   "<<constraint<<" \n\n";
+		lp_s = CGAL::solve_quadratic_program(lp, ET());
+		//cout<<"kakadui\n";
+		cout<<pr<<"    "<<-lp_s.objective_value()<<"\n";
+		//cout<<pp[0][pr]<<"   "<<pp[1][pr]<<"   "<<pp[2][pr]<<"\n";
+		//cout<<"\n\n\n";
+		if (d) return;
+		if (-lp_s.objective_value()>1.574)
+			rec(pr+1, constraint+1);
+		if (d) return;
+		for (k=0;k<8;k++) lp.set_a(k, constraint, 0);
+		lp.set_b(constraint, 0);*/
+	//}
+}
+
 int main(int argc, char *argv[]) {
 	try {
 		////////////////////
@@ -183,7 +276,7 @@ int main(int argc, char *argv[]) {
 						used_profile[profile][paths[2][i2][k+1]][paths[2][i2][k]]++;
 					}
 					// Print out one used_profile and the paths beloging to it
-					/*if (i0==1 && i1==1 && i2==1){
+					/*if (i0==0 && i1==0 && i2==4){
 						cout<<profile<<"\n";
 						for (int ii=0;ii<6;ii++){
 							for (int jj=0;jj<6;jj++)
@@ -240,12 +333,12 @@ int main(int argc, char *argv[]) {
 		model.setObjective( v_edges[edge(0,3)] + v_edges[edge(1,4)] + v_edges[edge(2,5)] , GRB_MAXIMIZE);
 
 		// Optimize model and look at result -> not yet min Nash
-		model.optimize();
+		/*model.optimize();
 		for (int i = 0; i < n_variables; i++) {
 			cout << v_edges[i].get(GRB_StringAttr_VarName) << " "
 		     << v_edges[i].get(GRB_DoubleAttr_X) << endl;
 		}
-		cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
+		cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;*/
 
 		// 6.1:
 		// learning from paper example:
@@ -255,9 +348,9 @@ int main(int argc, char *argv[]) {
 		const double paper_nash = paper_costs[edge(0,3)] + paper_costs[edge(1,4)] + paper_costs[edge(2,5)];
 		double diff = 0; // difference 
 		int pr; // profile number which we are looking at
-		vector <int> which_guy[mult_paths], which_strategy[mult_paths]; // guy and strategy we save after some tests
-		int heavy_profile[mult_paths];
-		memset(heavy_profile, 0, sizeof(heavy_profile));
+		vector<int> which_guy; // first profile, than guy
+		vector<int> which_strategy; // first profile, than strategy
+		vector<int> heavy_profile(mult_paths,0);
 		// go trough all profiles
 		for (pr = 1; pr < mult_paths; pr++){
 			// go trough all players
@@ -297,8 +390,10 @@ int main(int argc, char *argv[]) {
 						if (diff < 0){
 							if (pr > 0)
 								//cout << "Profile = " << pr << ".  " << i << " guy wants to change to " << j << "-th strategy  " << "and diff is " << diff << endl;
-							which_guy[pr].push_back(i);
-							which_strategy[pr].push_back(j);
+							which_guy.push_back(pr);
+							which_guy.push_back(i);
+							which_strategy.push_back(pr);
+							which_strategy.push_back(j);
 						}					
 					}
 				}
@@ -319,16 +414,15 @@ int main(int argc, char *argv[]) {
 				heavy_profile[pr] = 1;
 			}
 		}
-		cout << "We found " << which_strategy[pr].size() << " changes we want to have a closer look on" << endl;
+		cout << "We found " << which_guy.size()/2 << " changes we want to have a closer look on" << endl;
 
 		// 6.2
 		// Add constraints and solve each time lp. Do this recurivly and use data from which we learnd so far:
-		bool dont_proceed;
-/*	srand(time(NULL));
-	cout<<"vaa\n";
-	d = 0;
-	rec(1,constraint);
-	cout<<"sgsgsg\n";*/
+		bool dont_proceed = false;
+		cout<<"Start recursion\n";
+		for(int i=1;i<20;i++)
+			rec(i, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+		cout<<"End recursion\n";
 
 	} catch(GRBException e) {
 		cout << "Error code = " << e.getErrorCode() << endl;
