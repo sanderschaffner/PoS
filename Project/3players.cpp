@@ -50,10 +50,16 @@ int profile_path[3][125]; // connects profile and path -> pp[i][x] = y: for prof
 vector< vector<int> >  paths[3];
 double one = 1;
 
-void rec(int pr, bool dont_proceed, int mult_paths, GRBModel& model, GRBVar* v_edges, const int used_profile[125][6][6], const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile) {
+void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVar* v_edges, const int used_profile[125][6][6], const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile) {
 	if (pr == mult_paths) {
-		dont_proceed = false;
-		//cout << "gagaia simon amas rato ar beWdav?  " << lp_s << "\n";
+		//dont_proceed = false;
+
+		model.optimize();
+		for (int i = 0; i < 8; i++) {
+			cout << v_edges[i].get(GRB_StringAttr_VarName) << " " << v_edges[i].get(GRB_DoubleAttr_X) << endl;
+		}
+		cout << "PoS: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
+
 		return;
 	}
 
@@ -64,9 +70,10 @@ void rec(int pr, bool dont_proceed, int mult_paths, GRBModel& model, GRBVar* v_e
 	int used[6][6];
 	memset(used,0,sizeof(used));
 	int coef[8];
-	int rr = rand()%2;
 	GRBLinExpr path;
-	if (heavy_profile[pr] && rr){
+	//int rr = rand()%2;
+	//if (heavy_profile[pr] && rr){
+	if (heavy_profile[pr]){
 		memset(coef, 0, sizeof(coef));
 		coef[edge(0,3)] = coef[edge(1,4)] = coef[edge(2,5)] = 1; // start with nash
 		for (i=0;i<6;i++){
@@ -85,8 +92,9 @@ void rec(int pr, bool dont_proceed, int mult_paths, GRBModel& model, GRBVar* v_e
 			cout<<coef[jj]<<" ";
 		cout<<"\n";*/
 		for (k=0;k<8;k++){
-			if(coef[k]!=0) path = path + v_edges[k]/coef[k];
+			if(coef[k]!=0) path = path + coef[k]*v_edges[k];
 		}
+		// Constraint tells: |N|<|S_i|
 		GRBConstr constr = model.addConstr(path <= 0);
 		model.optimize();
 		/*for (int i = 0; i < 8; i++) {
@@ -95,10 +103,13 @@ void rec(int pr, bool dont_proceed, int mult_paths, GRBModel& model, GRBVar* v_e
 		}
 		cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;*/
 
-		if (dont_proceed) return;
-		if (model.get(GRB_DoubleAttr_ObjVal)>1.574)
-			rec(i, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
-		if (dont_proceed) return;
+		//if (dont_proceed) return;
+		int optimstatus = model.get(GRB_IntAttr_Status);
+		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
+			if (model.get(GRB_DoubleAttr_ObjVal)>1.574)
+				rec(pr+1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+		}
+		//if (dont_proceed) return;
 		// delete added constr:
 		model.remove(constr);
 		return;
@@ -113,8 +124,8 @@ void rec(int pr, bool dont_proceed, int mult_paths, GRBModel& model, GRBVar* v_e
 			tmp2.push_back(which_strategy[i+1]);
 		}
 	}
-	int tt = rand()%count;		
-	//for (int tt=0;tt<which_guy[pr].size();tt++){
+	//int tt = rand()%count;		
+	for (int tt=0;tt<tmp.size();tt++){
 		i = tmp[tt]; // guy
 		j = tmp2[tt]; // strategy
 		//cout<<pr<<"  "<<i<<"  "<<j<<"\n"; 
@@ -152,17 +163,23 @@ void rec(int pr, bool dont_proceed, int mult_paths, GRBModel& model, GRBVar* v_e
 		GRBConstr constr = model.addConstr(path2 <= 0);
 		//cout<<pr<<"   "<<constraint<<" \n\n";
 		model.optimize();
-		//cout<<"kakadui\n";
-		cout<<pr<<"    "<<model.get(GRB_DoubleAttr_ObjVal)<<"\n";
-		//cout<<pp[0][pr]<<"   "<<pp[1][pr]<<"   "<<pp[2][pr]<<"\n";
-		//cout<<"\n\n\n";
-		if (dont_proceed) return;
-		if (model.get(GRB_DoubleAttr_ObjVal)>1.574)
-			rec(i, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
-		if (dont_proceed) return;
+/*		if(model.get(GRB_DoubleAttr_ObjVal)>1.63) {
+			for (int i = 0; i < 8; i++) {
+				cout << v_edges[i].get(GRB_StringAttr_VarName) << " " << v_edges[i].get(GRB_DoubleAttr_X) << endl;
+			}
+			cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
+		}
+		cout<<pr<<"  :)  "<<model.get(GRB_DoubleAttr_ObjVal)<<"\n";*/
+		//if (dont_proceed) return;
+		int optimstatus = model.get(GRB_IntAttr_Status);
+		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
+			if (model.get(GRB_DoubleAttr_ObjVal)>1.5) //1.574
+				rec(pr+1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+		}
+		//if (dont_proceed) return;
 		// delete added constr:
 		model.remove(constr);
-	//}
+	}
 }
 
 int main(int argc, char *argv[]) {
@@ -216,6 +233,8 @@ int main(int argc, char *argv[]) {
 		GRBEnv env = GRBEnv();
 
 		GRBModel model = GRBModel(env);
+
+		model.getEnv().set(GRB_IntParam_OutputFlag, 0);
 		
 		// Create variables
 		// var_number: note x -> node y
@@ -445,9 +464,13 @@ int main(int argc, char *argv[]) {
 		// Add constraints and solve each time lp. Do this recurivly and use data from which we learnd so far:
 		bool dont_proceed = false;
 		cout<<"Start recursion\n";
-		for(int i=1;i<20;i++)
-			rec(i, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+		rec(1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
 		cout<<"End recursion\n";
+/*		for (int i = 0; i < n_variables; i++) {
+			cout << v_edges[i].get(GRB_StringAttr_VarName) << " "
+		     << v_edges[i].get(GRB_DoubleAttr_X) << endl;
+		}
+		cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;*/
 
 	} catch(GRBException e) {
 		cout << "Error code = " << e.getErrorCode() << endl;
