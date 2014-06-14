@@ -45,6 +45,11 @@ int edge(int i, int j){
 		return -1; // gives segfault bc array[-1] doesnt exist
 }
 
+// globals for rec:
+int profile_path[3][125]; // connects profile and path -> pp[i][x] = y: for profile x we used path y of player i
+vector< vector<int> >  paths[3];
+double one = 1;
+
 void rec(int pr, bool dont_proceed, int mult_paths, GRBModel& model, GRBVar* v_edges, const int used_profile[125][6][6], const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile) {
 	if (pr == mult_paths) {
 		dont_proceed = false;
@@ -98,17 +103,36 @@ void rec(int pr, bool dont_proceed, int mult_paths, GRBModel& model, GRBVar* v_e
 		model.remove(constr);
 		return;
 	}
-/*	int tt = rand()%which_guy[pr].size();		
+	int count = 0;
+	vector<int> tmp;
+	vector<int> tmp2;
+	for(i = 0; i<which_guy.size(); i+=2){
+		if(which_guy[i]==pr) {
+			count++;
+			tmp.push_back(which_guy[i+1]);
+			tmp2.push_back(which_strategy[i+1]);
+		}
+	}
+	int tt = rand()%count;		
 	//for (int tt=0;tt<which_guy[pr].size();tt++){
-		i = which_guy[pr][tt];
-		j = which_strategy[pr][tt];
+		i = tmp[tt]; // guy
+		j = tmp2[tt]; // strategy
 		//cout<<pr<<"  "<<i<<"  "<<j<<"\n"; 
 		for (int ii=0;ii<6;ii++)
 			for (int jj=0;jj<6;jj++)
 				used[ii][jj] = used_profile[pr][ii][jj];
-		int t = pp[i][pr];
+		int t = profile_path[i][pr];
 		memset(coef, 0, sizeof(coef));
 		//now subtract from used pp[i][pr] strategy and insert j-th strategy instead
+/*		cout<<"start: "<<endl;
+		for (int i = 0; i < paths[3].size(); i++) {
+			vector<int>tmp = paths[3][i];
+			for(int j = 0; j < tmp.size(); j++) {
+				std::cout << tmp[j];
+			}
+			printf("\n");
+	    }
+		cout<<"guy "<<i<<"; path "<<t<<"; "<<endl;*/
 		for (k=0;k<paths[i][t].size()-1;k++){
 			coef[edge(paths[i][t][k],paths[i][t][k+1])] = -one/used[paths[i][t][k]][paths[i][t][k+1]];
 			used[paths[i][t][k]][paths[i][t][k+1]]--;
@@ -120,21 +144,24 @@ void rec(int pr, bool dont_proceed, int mult_paths, GRBModel& model, GRBVar* v_e
 			used[paths[i][j][k+1]][paths[i][j][k]]++;
 			coef[edge(paths[i][j][k],paths[i][j][k+1])] += one/used[paths[i][j][k]][paths[i][j][k+1]];					
 		}
-		for (k=0;k<8;k++) {lp.set_a(k, constraint, coef[k]);}
+		GRBLinExpr path2;
+		for (k=0;k<8;k++){
+			if(coef[k]!=0) path2 = path2 + v_edges[k]*coef[k];
+		}
 		//cout<<"\n";
-		lp.set_b(constraint, zero);
+		GRBConstr constr = model.addConstr(path2 <= 0);
 		//cout<<pr<<"   "<<constraint<<" \n\n";
-		lp_s = CGAL::solve_quadratic_program(lp, ET());
+		model.optimize();
 		//cout<<"kakadui\n";
-		cout<<pr<<"    "<<-lp_s.objective_value()<<"\n";
+		cout<<pr<<"    "<<model.get(GRB_DoubleAttr_ObjVal)<<"\n";
 		//cout<<pp[0][pr]<<"   "<<pp[1][pr]<<"   "<<pp[2][pr]<<"\n";
 		//cout<<"\n\n\n";
-		if (d) return;
-		if (-lp_s.objective_value()>1.574)
-			rec(pr+1, constraint+1);
-		if (d) return;
-		for (k=0;k<8;k++) lp.set_a(k, constraint, 0);
-		lp.set_b(constraint, 0);*/
+		if (dont_proceed) return;
+		if (model.get(GRB_DoubleAttr_ObjVal)>1.574)
+			rec(i, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+		if (dont_proceed) return;
+		// delete added constr:
+		model.remove(constr);
 	//}
 }
 
@@ -177,7 +204,7 @@ int main(int argc, char *argv[]) {
 		paths_p2.getAllPaths(graph);
 		paths_p3.getAllPaths(graph);
 		//paths_p2.print();
-		vector< vector<int> >  paths[3];
+		
 		paths[0] = paths_p1.getExistingPaths();
 		paths[1] = paths_p2.getExistingPaths();
 		paths[2] = paths_p3.getExistingPaths();
@@ -222,7 +249,6 @@ int main(int argc, char *argv[]) {
 		// 4:
 		// Inequalities checking that the edges (0,3) (1,4) and (2,5) give a Nash equilibrium
 		int used[size][size];
-		double one = 1;
 		memset(used, 0, sizeof(used));
 		used[0][3] = used[3][0] = used[1][4] = used[4][1] = used[2][5] = used[5][2] = 1; // used paths in nash
 		double tmp_double;
@@ -258,7 +284,6 @@ int main(int argc, char *argv[]) {
 		int mult_paths = paths_pp[0] * paths_pp[1] * paths_pp[2];
 		int used_profile[mult_paths][size][size];
 		memset(used_profile, 0, sizeof(used_profile));
-		int profile_path[3][mult_paths]; // connects profile and path -> pp[i][x] = y: for profile x we used path y of player i
 		vector<int> expensive;
 		for (i0 = 0; i0 < paths_pp[0]; i0++){
 			for (i1 = 0; i1 < paths_pp[1]; i1++){
