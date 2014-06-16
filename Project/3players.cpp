@@ -53,8 +53,9 @@ int edge(int i, int j){
 int profile_path[3][125]; // connects profile and path -> pp[i][x] = y: for profile x we used path y of player i
 vector< vector<int> >  paths[3];
 double one = 1;
+double eps = 0.00000;
 
-void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVar* v_edges, const int used_profile[125][6][6], const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile) {
+void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVar* v_edges, const int used_profile[125][6][6], const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile, double& maximum) {
 	if (pr == mult_paths) {
 		// If we reach this point, we have a new PoS:)
 		//dont_proceed = false;
@@ -63,6 +64,7 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 		for (int i = 0; i < 8; i++) {
 			cout << v_edges[i].get(GRB_StringAttr_VarName) << " " << v_edges[i].get(GRB_DoubleAttr_X) << endl;
 		}
+		maximum = model.get(GRB_DoubleAttr_ObjVal);
 		cout << "PoS: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
 
 		return;
@@ -111,17 +113,17 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 		//if (dont_proceed) return;
 		int optimstatus = model.get(GRB_IntAttr_Status);
 		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
-			if (model.get(GRB_DoubleAttr_ObjVal)>1.574) {
+			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
 				if(pr==44){
-					rec(104, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+					rec(104, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 				} else if(pr==104){
-					rec(1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+					rec(1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 				} else if(pr==43){
-					rec(45, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+					rec(45, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 				} else if(pr==103){
-					rec(105, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+					rec(105, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 				} else {
-					rec(pr+1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+					rec(pr+1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 				}
 			}				
 		}
@@ -182,7 +184,7 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 			if(coef[k]!=0) path2 = path2 + v_edges[k]*coef[k];
 		}
 		//cout<<"\n";
-		GRBConstr constr = model.addConstr(path2 <= 0);
+		GRBConstr constr = model.addConstr(path2 <= 0-eps);
 		//cout<<pr<<"   "<<constraint<<" \n\n";
 		model.optimize();
 /*		if(model.get(GRB_DoubleAttr_ObjVal)>1.63) {
@@ -195,18 +197,18 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 		//if (dont_proceed) return;
 		int optimstatus = model.get(GRB_IntAttr_Status);
 		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
-			cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << endl;
-			if (model.get(GRB_DoubleAttr_ObjVal)>1.574) { //1.574
+			//cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << " " << maximum << endl;
+			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
 				if(pr==44){
-					rec(104, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+					rec(104, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 				} else if(pr==104){
-					rec(1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+					rec(1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 				} else if(pr==43){
-					rec(45, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+					rec(45, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 				} else if(pr==103){
-					rec(105, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+					rec(105, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 				} else {
-					rec(pr+1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+					rec(pr+1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 				}
 			}	
 		}
@@ -223,7 +225,7 @@ int main(int argc, char *argv[]) {
 		////////////////////
 		const unsigned int size = 6; // defines how many nodes we have in our graph (also edit this in paths.h)
 		const int n_variables = 8; // defines the number of edges we have in our graph
-		const double lowerBound = 0.001; // lower bound for Gurobi
+		const double lowerBound = 0.00; // lower bound for Gurobi
 		const double upperBound = GRB_INFINITY; // upper bound for Gurobi
 
 		///////////////////////////////////////////////////////////
@@ -465,14 +467,14 @@ int main(int argc, char *argv[]) {
 						}
 
 						// if difference is negative we save person and profile number! 
-						if (diff < 0){
+						//if (diff < 0){
 							if (pr > 0)
 								//cout << "Profile = " << pr << ".  " << i << " guy wants to change to " << j << "-th strategy  " << "and diff is " << diff << endl;
 							which_guy.push_back(pr);
 							which_guy.push_back(i);
 							which_strategy.push_back(pr);
 							which_strategy.push_back(j);
-						}					
+						//}					
 					}
 				}
 			}
@@ -501,7 +503,8 @@ int main(int argc, char *argv[]) {
 		// Add constraints and solve each time lp. Do this recurivly and use data from which we learnd so far:
 		bool dont_proceed = false;
 		cout<<"Start recursion\n";
-		rec(44, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+		double maximum = 1.5; // 1.574
+		rec(44, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 		cout<<"End recursion\n";
 /*		for (int i = 0; i < n_variables; i++) {
 			cout << v_edges[i].get(GRB_StringAttr_VarName) << " "
