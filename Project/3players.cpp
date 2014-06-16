@@ -4,6 +4,10 @@
 #include <iterator> // for ostream_iterator
 #include <string.h> // memset
 
+#include <stdio.h>      /* printf, NULL */
+#include <stdlib.h>     /* srand, rand */
+#include <time.h>       /* time */
+
 #include "gurobi_c++.h"
 /*#include "matrix.h"*/
 #include "paths.h"
@@ -52,6 +56,7 @@ double one = 1;
 
 void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVar* v_edges, const int used_profile[125][6][6], const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile) {
 	if (pr == mult_paths) {
+		// If we reach this point, we have a new PoS:)
 		//dont_proceed = false;
 
 		model.optimize();
@@ -69,7 +74,7 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 	int i,j,k;
 	int used[6][6];
 	memset(used,0,sizeof(used));
-	int coef[8];
+	double coef[8];
 	GRBLinExpr path;
 	//int rr = rand()%2;
 	//if (heavy_profile[pr] && rr){
@@ -82,7 +87,7 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 			}
 		}
 		// print profile and coeffs:
-		/*cout<<pr<<"\n";
+/*		cout<<pr<<"\n";
 		for (int ii=0;ii<6;ii++){
 			for (int jj=0;jj<6;jj++)
 				cout<<used_profile[pr][ii][jj]<<" ";
@@ -97,7 +102,7 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 		// Constraint tells: |N|<|S_i|
 		GRBConstr constr = model.addConstr(path <= 0);
 		model.optimize();
-		/*for (int i = 0; i < 8; i++) {
+/*		for (int i = 0; i < 8; i++) {
 			cout << v_edges[i].get(GRB_StringAttr_VarName) << " "
 		     << v_edges[i].get(GRB_DoubleAttr_X) << endl;
 		}
@@ -106,8 +111,19 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 		//if (dont_proceed) return;
 		int optimstatus = model.get(GRB_IntAttr_Status);
 		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
-			if (model.get(GRB_DoubleAttr_ObjVal)>1.574)
-				rec(pr+1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+			if (model.get(GRB_DoubleAttr_ObjVal)>1.574) {
+				if(pr==44){
+					rec(104, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+				} else if(pr==104){
+					rec(1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+				} else if(pr==43){
+					rec(45, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+				} else if(pr==103){
+					rec(105, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+				} else {
+					rec(pr+1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+				}
+			}				
 		}
 		//if (dont_proceed) return;
 		// delete added constr:
@@ -119,20 +135,26 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 	vector<int> tmp2;
 	for(i = 0; i<which_guy.size(); i+=2){
 		if(which_guy[i]==pr) {
+			//cout<<which_strategy[i+1]<<endl;
 			count++;
 			tmp.push_back(which_guy[i+1]);
 			tmp2.push_back(which_strategy[i+1]);
 		}
 	}
-	//int tt = rand()%count;		
-	for (int tt=0;tt<tmp.size();tt++){
+	srand (time(NULL));
+	//int tt = rand()%count;// i: seed one each time
+	//int a[2] = {rand()%count,rand()%count}; // ii: seed 2 each time
+	//for (int n=0;n<2;n++){
+	//	int tt = a[n];
+	for (int tt=0;tt<tmp.size();tt++){ // iii: seed all
+
 		i = tmp[tt]; // guy
 		j = tmp2[tt]; // strategy
 		//cout<<pr<<"  "<<i<<"  "<<j<<"\n"; 
 		for (int ii=0;ii<6;ii++)
 			for (int jj=0;jj<6;jj++)
 				used[ii][jj] = used_profile[pr][ii][jj];
-		int t = profile_path[i][pr];
+		int t = profile_path[i][pr]; // path of player i belonging to this profile (so the old one which we want to change)
 		memset(coef, 0, sizeof(coef));
 		//now subtract from used pp[i][pr] strategy and insert j-th strategy instead
 /*		cout<<"start: "<<endl;
@@ -173,13 +195,25 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 		//if (dont_proceed) return;
 		int optimstatus = model.get(GRB_IntAttr_Status);
 		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
-			if (model.get(GRB_DoubleAttr_ObjVal)>1.5) //1.574
-				rec(pr+1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+			cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << endl;
+			if (model.get(GRB_DoubleAttr_ObjVal)>1.574) { //1.574
+				if(pr==44){
+					rec(104, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+				} else if(pr==104){
+					rec(1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+				} else if(pr==43){
+					rec(45, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+				} else if(pr==103){
+					rec(105, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+				} else {
+					rec(pr+1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+				}
+			}	
 		}
 		//if (dont_proceed) return;
 		// delete added constr:
 		model.remove(constr);
-	}
+	} // for ii and iii
 }
 
 int main(int argc, char *argv[]) {
@@ -396,7 +430,7 @@ int main(int argc, char *argv[]) {
 		vector<int> which_strategy; // first profile, than strategy
 		vector<int> heavy_profile(mult_paths,0);
 		// go trough all profiles
-		for (pr = 1; pr < mult_paths; pr++){
+		for (pr = 1; pr < mult_paths+1; pr++){
 			// go trough all players
 			for (int i = 0; i < 3; i++){
 				// i-th guy wants to deviate
@@ -459,12 +493,15 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		cout << "We found " << which_guy.size()/2 << " changes we want to have a closer look on" << endl;
+/*		for(int i = 0; i<which_strategy.size(); i+=2){
+			cout << which_strategy[i] << " " << which_strategy[i+1] << endl;
+		}*/
 
 		// 6.2
 		// Add constraints and solve each time lp. Do this recurivly and use data from which we learnd so far:
 		bool dont_proceed = false;
 		cout<<"Start recursion\n";
-		rec(1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
+		rec(44, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile);
 		cout<<"End recursion\n";
 /*		for (int i = 0; i < n_variables; i++) {
 			cout << v_edges[i].get(GRB_StringAttr_VarName) << " "
