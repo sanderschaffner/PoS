@@ -14,6 +14,17 @@
 
 using namespace std;
 
+//without eps
+//highest nesh: wrong: [0,1,0.136364],[1,2,0.237013],[2,4,0.37013],[4,3,0.256494],[3,5,0],[0,3,0.506494],[1,4,0.493506],[2,5,0.626623]
+//lower nesh: wrong: [0,1,0.0997831],[1,2,0.247289],[2,4,0.370933],[4,3,0.281996],[3,5,0],[0,3,0.488069],[1,4,0.494577],[2,5,0.591106]
+//[0,3],[1,4],[2,5]
+
+//with eps
+// 1.573749: [0,1,0.0997837],[1,2,0.247287],[2,4,0.370934],[4,3,0.281996],[3,5,0],[0,3,0.488069],[1,4,0.494576],[2,5,0.591104]
+
+//[0,1,],[1,2,],[2,4,],[4,3,],[3,5,],[0,3,],[1,4,],[2,5,]
+//[0,1,0.],[1,2,0.],[2,4,0.],[4,3,0.],[3,5,0.],[0,3,0.],[1,4,0.],[2,5,0.]
+
 typedef double var;
 
 /*
@@ -64,6 +75,26 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 		for (int i = 0; i < 8; i++) {
 			cout << v_edges[i].get(GRB_StringAttr_VarName) << " " << v_edges[i].get(GRB_DoubleAttr_X) << endl;
 		}
+		cout << "for python script: [0,1,"<<v_edges[0].get(GRB_DoubleAttr_X)<<
+				"],[1,2,"<<v_edges[1].get(GRB_DoubleAttr_X)<<
+				"],[2,4,"<<v_edges[2].get(GRB_DoubleAttr_X)<<
+				"],[4,3,"<<v_edges[3].get(GRB_DoubleAttr_X)<<
+				"],[3,5,"<<v_edges[4].get(GRB_DoubleAttr_X)<<
+				"],[0,3,"<<v_edges[5].get(GRB_DoubleAttr_X)<<
+				"],[1,4,"<<v_edges[6].get(GRB_DoubleAttr_X)<<
+				"],[2,5,"<<v_edges[7].get(GRB_DoubleAttr_X)<<
+				"]"<<endl;
+
+		cout << "Straight line:" << endl;
+		cout << "cost p1 on opt: " << v_edges[0].get(GRB_DoubleAttr_X)+v_edges[1].get(GRB_DoubleAttr_X)/2+v_edges[2].get(GRB_DoubleAttr_X)/3+v_edges[3].get(GRB_DoubleAttr_X)/2 << endl;
+		cout << "cost p2 on opt: " << v_edges[1].get(GRB_DoubleAttr_X)/2+v_edges[2].get(GRB_DoubleAttr_X)/3 << endl;
+		cout << "cost p3 on opt: " << v_edges[2].get(GRB_DoubleAttr_X)/3+v_edges[3].get(GRB_DoubleAttr_X)/2+v_edges[4].get(GRB_DoubleAttr_X) << endl;
+
+		cout << "Player 1 goes N (0,3) others straight line:" << endl;
+		cout << "cost p1: " << v_edges[5].get(GRB_DoubleAttr_X) << endl;
+		cout << "cost p2 straight: " << v_edges[1].get(GRB_DoubleAttr_X)+v_edges[2].get(GRB_DoubleAttr_X)/2 << endl;
+		cout << "cost p3 straight: " << v_edges[2].get(GRB_DoubleAttr_X)/2+v_edges[3].get(GRB_DoubleAttr_X)+v_edges[4].get(GRB_DoubleAttr_X) << endl;
+
 		maximum = model.get(GRB_DoubleAttr_ObjVal);
 		cout << "PoS: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
 
@@ -88,6 +119,7 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 				if (used_profile[pr][i][j]>0) coef[edge(i,j)]-=1;
 			}
 		}
+
 		// print profile and coeffs:
 /*		cout<<pr<<"\n";
 		for (int ii=0;ii<6;ii++){
@@ -149,7 +181,6 @@ void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVa
 	//for (int n=0;n<2;n++){
 	//	int tt = a[n];
 	for (int tt=0;tt<tmp.size();tt++){ // iii: seed all
-
 		i = tmp[tt]; // guy
 		j = tmp2[tt]; // strategy
 		//cout<<pr<<"  "<<i<<"  "<<j<<"\n"; 
@@ -256,11 +287,19 @@ int main(int argc, char *argv[]) {
 		paths_p1.getAllPaths(graph);
 		paths_p2.getAllPaths(graph);
 		paths_p3.getAllPaths(graph);
-		//paths_p2.print();
+		//paths_p3.print();
 		
 		paths[0] = paths_p1.getExistingPaths();
 		paths[1] = paths_p2.getExistingPaths();
 		paths[2] = paths_p3.getExistingPaths();
+
+/*		cout<<endl<<"path 2 test: ";
+		for(int bub=0;bub<5;bub++){
+			for(int bl=0; bl < paths[2][bub].size();bl++ )
+				cout<<paths[2][bub][bl];
+			cout<<" ";
+		}
+		cout<<endl;*/
 
 		//////////////////////////////////////////
 		// Define optimization problem with GUROBI
@@ -356,7 +395,7 @@ int main(int argc, char *argv[]) {
 						used_profile[profile][paths[2][i2][k+1]][paths[2][i2][k]]++;
 					}
 					// Print out one used_profile and the paths beloging to it
-/*					if (i0==4 && i1==4 && i2==4){
+					if (i0==0 && i1==3 && i2==4){
 						cout<<profile<<"\n";
 						for (int ii=0;ii<6;ii++){
 							for (int jj=0;jj<6;jj++)
@@ -370,10 +409,10 @@ int main(int argc, char *argv[]) {
 						for(int bl=0; bl < paths[1][i1].size();bl++ )
 							cout<<paths[1][i1][bl];
 						cout<<endl<<"path 2: ";
-						for(int bl=0; bl < paths[2][i1].size();bl++ )
+						for(int bl=0; bl < paths[2][i2].size();bl++ )
 							cout<<paths[2][i2][bl];
 						cout<<endl;
-					}	*/
+					}	
 					profile_path[0][profile] = i0;
 					profile_path[1][profile] = i1;
 					profile_path[2][profile] = i2;
@@ -495,7 +534,7 @@ int main(int argc, char *argv[]) {
 				heavy_profile[pr] = 1;
 			}
 		}
-		cout << "We found " << which_guy.size()/2 << " changes we want to have a closer look on" << endl;
+		cout << "We found " << which_guy.size()/2 << " changes we want to have a closer look on" <<endl;
 /*		for(int i = 0; i<which_strategy.size(); i+=2){
 			cout << which_strategy[i] << " " << which_strategy[i+1] << endl;
 		}*/
@@ -504,7 +543,7 @@ int main(int argc, char *argv[]) {
 		// Add constraints and solve each time lp. Do this recurivly and use data from which we learnd so far:
 		bool dont_proceed = false;
 		cout<<"Start recursion\n";
-		double maximum = 1.5; // 1.574
+		double maximum = 1.5737; // 1.574
 		rec(44, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 		cout<<"End recursion\n";
 /*		for (int i = 0; i < n_variables; i++) {
