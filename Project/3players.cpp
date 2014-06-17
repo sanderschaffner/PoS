@@ -356,7 +356,7 @@ int main(int argc, char *argv[]) {
 						used_profile[profile][paths[2][i2][k+1]][paths[2][i2][k]]++;
 					}
 					// Print out one used_profile and the paths beloging to it
-					/*if (i0==0 && i1==0 && i2==4){
+/*					if (i0==4 && i1==4 && i2==4){
 						cout<<profile<<"\n";
 						for (int ii=0;ii<6;ii++){
 							for (int jj=0;jj<6;jj++)
