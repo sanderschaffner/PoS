@@ -373,7 +373,7 @@ int main(int argc, char *argv[]) {
 						for(int bl=0; bl < paths[2][i1].size();bl++ )
 							cout<<paths[2][i2][bl];
 						cout<<endl;
-					}*/	
+					}	*/
 					profile_path[0][profile] = i0;
 					profile_path[1][profile] = i1;
 					profile_path[2][profile] = i2;
@@ -432,7 +432,7 @@ int main(int argc, char *argv[]) {
 		vector<int> which_strategy; // first profile, than strategy
 		vector<int> heavy_profile(mult_paths,0);
 		// go trough all profiles
-		for (pr = 1; pr < mult_paths+1; pr++){
+		for (pr = 1; pr < mult_paths; pr++){
 			// go trough all players
 			for (int i = 0; i < 3; i++){
 				// i-th guy wants to deviate
@@ -484,8 +484,9 @@ int main(int argc, char *argv[]) {
 			for (int i = 0; i < size; i++)
 				for (int j = i + 1; j < size; j++){
 					// subtract all costs of the proposed profile from Nash
-					if (used_profile[pr][i][j] > 0)
+					if (used_profile[pr][i][j] > 0) {
 						diff -= paper_costs[edge(i,j)];
+					}
 				}
 			if ( diff < 0) 
 			{
