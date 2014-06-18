@@ -59,7 +59,7 @@ int edge(int i, int j){
 		return -1; // gives segfault bc array[-1] doesnt exist
 }
 
-void rec(int number, const vector<unsigned int>& profileOrder, const int& mult_paths, GRBModel& model, GRBVar* v_edges, const vector< vector< vector< int > > >& used_profile, const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile, double& maximum, const vector< vector< vector< int > > >& paths, const vector< vector< int > >& profile_path, const double& one, const double& eps) {
+void rec(int number, const vector<unsigned int>& profileOrder, const unsigned int& n_variables, const unsigned int& size, const int& mult_paths, GRBModel& model, GRBVar* v_edges, const vector< vector< vector< int > > >& used_profile, const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile, double& maximum, const vector< vector< vector< int > > >& paths, const vector< vector< int > >& profile_path, const double& one, const double& eps) {
 	int pr = profileOrder[number];
 	if (pr == mult_paths) {
 		// If we reach this point, we have a new PoS:)
@@ -98,17 +98,17 @@ void rec(int number, const vector<unsigned int>& profileOrder, const int& mult_p
 	// one of the guys wants to change the strategy
 	// cout<< pr< < "\n";
 	int i,j,k;
-	int used[6][6];
+	int used[size][size];
 	memset(used,0,sizeof(used));
-	double coef[8];
+	double coef[n_variables];
 	GRBLinExpr path;
 	//int rr = rand()%2;
 	//if (heavy_profile[pr] && rr){
 	if (heavy_profile[pr]){
 		memset(coef, 0, sizeof(coef));
 		coef[edge(0,3)] = coef[edge(1,4)] = coef[edge(2,5)] = 1; // start with nash
-		for (i=0;i<6;i++){
-			for (j=i+1;j<6;j++){
+		for (i=0;i<size;i++){
+			for (j=i+1;j<size;j++){
 				if (used_profile[pr][i][j]>0) coef[edge(i,j)]-=1;
 			}
 		}
@@ -123,7 +123,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const int& mult_p
 		for (int jj=0;jj<8;jj++)
 			cout<<coef[jj]<<" ";
 		cout<<"\n";*/
-		for (k=0;k<8;k++){
+		for (k=0;k<n_variables;k++){
 			if(coef[k]!=0) path = path + coef[k]*v_edges[k];
 		}
 		// Constraint tells: |N|<|S_i|
@@ -138,7 +138,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const int& mult_p
 		int optimstatus = model.get(GRB_IntAttr_Status);
 		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
 			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
-				rec(number+1, profileOrder, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
+				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
 			}				
 		}
 		// delete added constr:
@@ -165,8 +165,8 @@ void rec(int number, const vector<unsigned int>& profileOrder, const int& mult_p
 		i = tmp[tt]; // guy
 		j = tmp2[tt]; // strategy
 		//cout<<pr<<"  "<<i<<"  "<<j<<"\n"; 
-		for (int ii=0;ii<6;ii++)
-			for (int jj=0;jj<6;jj++)
+		for (int ii=0;ii<size;ii++)
+			for (int jj=0;jj<size;jj++)
 				used[ii][jj] = used_profile[pr][ii][jj];
 		int t = profile_path[i][pr]; // path of player i belonging to this profile (so the old one which we want to change)
 		memset(coef, 0, sizeof(coef));
@@ -192,7 +192,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const int& mult_p
 			coef[edge(paths[i][j][k],paths[i][j][k+1])] += one/used[paths[i][j][k]][paths[i][j][k+1]];					
 		}
 		GRBLinExpr path2;
-		for (k=0;k<8;k++){
+		for (k=0;k<n_variables;k++){
 			if(coef[k]!=0) path2 = path2 + v_edges[k]*coef[k];
 		}
 		//cout<<"\n";
@@ -211,7 +211,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const int& mult_p
 		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
 			//cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << " " << maximum << endl;
 			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
-				rec(number+1, profileOrder, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
+				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
 			}	
 		}
 		// delete added constr:
@@ -231,7 +231,7 @@ int main(int argc, char *argv[]) {
 		const double one = 1;
 		const double eps = 0.00000;
 
-		const double learn_costs[8] = {113,277,418,318,0,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
+		const double learn_costs[n_variables] = {113,277,418,318,0,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
 
 		/////////////////////
 		// Order of profiles:
@@ -555,7 +555,7 @@ int main(int argc, char *argv[]) {
 
 		cout<<"Start recursion\n";
 		double maximum = 1.5737; // 1.574
-		rec(0, profileOrder, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
+		rec(0, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
 		cout<<"End recursion\n";
 /*		for (int i = 0; i < n_variables; i++) {
 			cout << v_edges[i].get(GRB_StringAttr_VarName) << " "
