@@ -9,6 +9,7 @@
 #include <time.h>       /* time */
 
 #include "gurobi_c++.h"
+/*#include "matrix.h"*/
 #include "paths.h"
 
 using namespace std;
@@ -59,10 +60,16 @@ int edge(int i, int j){
 		return -1; // gives segfault bc array[-1] doesnt exist
 }
 
-void rec(int number, const vector<unsigned int>& profileOrder, const int& mult_paths, GRBModel& model, GRBVar* v_edges, const vector< vector< vector< int > > >& used_profile, const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile, double& maximum, const vector< vector< vector< int > > >& paths, const vector< vector< int > >& profile_path, const double& one, const double& eps) {
-	int pr = profileOrder[number];
+// globals for rec:
+int profile_path[3][125]; // connects profile and path -> pp[i][x] = y: for profile x we used path y of player i
+vector< vector<int> >  paths[3];
+double one = 1;
+double eps = 0.00000;
+
+void rec(int pr, bool dont_proceed, const int mult_paths, GRBModel& model, GRBVar* v_edges, const int used_profile[125][6][6], const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile, double& maximum) {
 	if (pr == mult_paths) {
 		// If we reach this point, we have a new PoS:)
+		//dont_proceed = false;
 
 		model.optimize();
 		for (int i = 0; i < 8; i++) {
@@ -135,12 +142,24 @@ void rec(int number, const vector<unsigned int>& profileOrder, const int& mult_p
 		}
 		cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;*/
 
+		//if (dont_proceed) return;
 		int optimstatus = model.get(GRB_IntAttr_Status);
 		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
 			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
-				rec(number+1, profileOrder, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
+				if(pr==44){
+					rec(104, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
+				} else if(pr==104){
+					rec(1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
+				} else if(pr==43){
+					rec(45, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
+				} else if(pr==103){
+					rec(105, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
+				} else {
+					rec(pr+1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
+				}
 			}				
 		}
+		//if (dont_proceed) return;
 		// delete added constr:
 		model.remove(constr);
 		return;
@@ -206,14 +225,25 @@ void rec(int number, const vector<unsigned int>& profileOrder, const int& mult_p
 			cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
 		}
 		cout<<pr<<"  :)  "<<model.get(GRB_DoubleAttr_ObjVal)<<"\n";*/
-
+		//if (dont_proceed) return;
 		int optimstatus = model.get(GRB_IntAttr_Status);
 		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
 			//cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << " " << maximum << endl;
 			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
-				rec(number+1, profileOrder, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
+				if(pr==44){
+					rec(104, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
+				} else if(pr==104){
+					rec(1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
+				} else if(pr==43){
+					rec(45, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
+				} else if(pr==103){
+					rec(105, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
+				} else {
+					rec(pr+1, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
+				}
 			}	
 		}
+		//if (dont_proceed) return;
 		// delete added constr:
 		model.remove(constr);
 	} // for ii and iii
@@ -225,19 +255,9 @@ int main(int argc, char *argv[]) {
 		// Variables to set:
 		////////////////////
 		const unsigned int size = 6; // defines how many nodes we have in our graph (also edit this in paths.h)
-		const unsigned int n_variables = 8; // defines the number of edges we have in our graph
+		const int n_variables = 8; // defines the number of edges we have in our graph
 		const double lowerBound = 0.00; // lower bound for Gurobi
 		const double upperBound = GRB_INFINITY; // upper bound for Gurobi
-		const double one = 1;
-		const double eps = 0.00000;
-
-		const double learn_costs[8] = {113,277,418,318,0,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
-
-		/////////////////////
-		// Order of profiles:
-		/////////////////////
-		unsigned int numberOfChanges = 2; // number of profiles accounted for in next line
-		unsigned int first[] = {44,104}; // write here the profiles which have to be consiered first!
 
 		///////////////////////////////////////////////////////////
 		// Create Graph and find all possible paths for each player
@@ -245,16 +265,15 @@ int main(int argc, char *argv[]) {
 
 		// 1:
 		// Matrix of graph we want to get PoS
-		vector< vector< unsigned int > > graph;
-		vector< unsigned int > tempZero;
-		for(int i = 0; i < size; i++){
-			tempZero.push_back(0);
-		}
-		for(int i = 0; i < size; i++){
-			graph.push_back(tempZero);
-		}
-		//unsigned int graph[size][size];
-		//memset(graph, 0, sizeof(graph));
+/*		Matrix<bool> graph(6,6);
+		graph(0,1) = 1; graph(1,2) = 1; graph(2,3) = 1; graph(3,4) = 1; graph(4,5) = 1;
+		graph(0,3) = 1; graph(1,4) = 1; graph(2,5) = 1;
+		// symmetric:
+		graph(1,0) = 1; graph(2,1) = 1; graph(3,2) = 1; graph(4,3) = 1; graph(5,4) = 1;
+		graph(3,0) = 1; graph(4,1) = 1; graph(5,2) = 1;*/
+		//cout << "matrix: " << endl << graph << endl;
+		unsigned int graph[size][size];
+		memset(graph, 0, sizeof(graph));
 		graph[0][1] = 1; graph[1][2] = 1; graph[2][4] = 1; graph[3][4] = 1; graph[3][5] = 1;
 		graph[1][0] = 1; graph[2][1] = 1; graph[4][2] = 1; graph[4][3] = 1; graph[5][3] = 1;
 		graph[0][3] = 1; graph[1][4] = 1; graph[2][5] = 1;
@@ -262,18 +281,25 @@ int main(int argc, char *argv[]) {
 
 		// 2:
 		// Get all possible paths for each player in the graph
-		Paths paths_p1(0,3,size); // source, target
-		Paths paths_p2(1,4,size); // source, target
-		Paths paths_p3(2,5,size); // source, target
+		Paths paths_p1(0,3); // source, target
+		Paths paths_p2(1,4); // source, target
+		Paths paths_p3(2,5); // source, target
 		paths_p1.getAllPaths(graph);
 		paths_p2.getAllPaths(graph);
 		paths_p3.getAllPaths(graph);
 		//paths_p3.print();
 		
-		vector< vector< vector<int> > >  paths;
-		paths.push_back(paths_p1.getExistingPaths());
-		paths.push_back(paths_p2.getExistingPaths());
-		paths.push_back(paths_p3.getExistingPaths());
+		paths[0] = paths_p1.getExistingPaths();
+		paths[1] = paths_p2.getExistingPaths();
+		paths[2] = paths_p3.getExistingPaths();
+
+/*		cout<<endl<<"path 2 test: ";
+		for(int bub=0;bub<5;bub++){
+			for(int bl=0; bl < paths[2][bub].size();bl++ )
+				cout<<paths[2][bub][bl];
+			cout<<" ";
+		}
+		cout<<endl;*/
 
 		//////////////////////////////////////////
 		// Define optimization problem with GUROBI
@@ -350,27 +376,8 @@ int main(int argc, char *argv[]) {
 		int i0, i1, i2, k;
 		int profile = 0;
 		int mult_paths = paths_pp[0] * paths_pp[1] * paths_pp[2];
-		vector< vector< vector<int> > > used_profile;
-		vector< vector<int> > profile_path; // connects profile and path -> pp[i][x] = y: for profile x we used path y of player i
-		// initialize used_profile[mult_paths][size][size]:
-		vector<int> sizeSingle;
-		vector<int> multi;
-		vector< vector<int> > sizeXsize;
-		for(i0 = 0; i0 < size; i0++){
-			sizeSingle.push_back(0);
-		}
-		for(i0 = 0; i0 < size; i0++){
-			sizeXsize.push_back(sizeSingle);
-		}
-		for(i0 = 0; i0 < mult_paths; i0++){
-			used_profile.push_back(sizeXsize);
-			multi.push_back(0);
-		}
-		for(i0 = 0; i0 < 3; i0++){
-			profile_path.push_back(multi);
-		}
-		//int used_profile[mult_paths][size][size];
-		//memset(used_profile, 0, sizeof(used_profile));
+		int used_profile[mult_paths][size][size];
+		memset(used_profile, 0, sizeof(used_profile));
 		vector<int> expensive;
 		for (i0 = 0; i0 < paths_pp[0]; i0++){
 			for (i1 = 0; i1 < paths_pp[1]; i1++){
@@ -433,25 +440,6 @@ int main(int argc, char *argv[]) {
 		}
 		cout << endl;*/
 
-		// 5.1: create order of profiles:
-		vector< unsigned int > profileOrder;
-		bool notIn;
-		for(int i = 0; i < numberOfChanges; i++){
-			profileOrder.push_back(first[i]);
-		}		
-		for(unsigned int i = 1; i<mult_paths+1; i++){
-			notIn = true;
-			for(int j = 0; j < numberOfChanges; j++){
-				if(i == first[j]) notIn = false;
-			}
-			if( notIn ) profileOrder.push_back(i);
-		}
-		cout << mult_paths << profileOrder.size() << endl;
-		for(int i = 0; i < profileOrder.size(); i++){
-			cout<< profileOrder[i]<<" ";
-		}
-		cout << endl;
-
 		// 6:
 		// Till now we have that |N| is Nash and direct line is min. But |N| is not yet min |N|
 		// We have to go trough all possible profiles and ensure that they are either bigger than |N| or are NOT Nash
@@ -474,8 +462,9 @@ int main(int argc, char *argv[]) {
 		// 6.1:
 		// learning from paper example:
 		// go trough all profiles and decide if it is worth to have a closer look according to the exaple out of the paper
-		// if in the new strategie the costs increas according to learn_costs (an therefore diff is pos) we won't consider it
-		const double paper_nash = learn_costs[edge(0,3)] + learn_costs[edge(1,4)] + learn_costs[edge(2,5)];
+		// if in the new strategie the costs increas according to paper_costs (an therefore diff is pos) we won't consider it
+		const double paper_costs[8] = {113,277,418,318,0,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
+		const double paper_nash = paper_costs[edge(0,3)] + paper_costs[edge(1,4)] + paper_costs[edge(2,5)];
 		double diff = 0; // difference 
 		int pr; // profile number which we are looking at
 		vector<int> which_guy; // first profile, than guy
@@ -499,7 +488,7 @@ int main(int argc, char *argv[]) {
 						// now subtract from used t = profile_path[i][pr] (old) strategy and insert j-th (new) strategy instead
 						for (k = 0; k < paths[i][t].size() - 1; k++){
 							// subtract from diff all edge-costs of path t and weight it apropriate
-							diff -= learn_costs[edge(paths[i][t][k],paths[i][t][k+1])] / used[paths[i][t][k]][paths[i][t][k+1]];
+							diff -= paper_costs[edge(paths[i][t][k],paths[i][t][k+1])] / used[paths[i][t][k]][paths[i][t][k+1]];
 							// get ridd of path t in used
 							used[paths[i][t][k]][paths[i][t][k+1]]--;
 							used[paths[i][t][k+1]][paths[i][t][k]]--;
@@ -513,7 +502,7 @@ int main(int argc, char *argv[]) {
 							used[paths[i][j][k]][paths[i][j][k+1]]++;
 							used[paths[i][j][k+1]][paths[i][j][k]]++;
 							// and then add costs
-							diff += learn_costs[edge(paths[i][j][k],paths[i][j][k+1])] / used[paths[i][j][k]][paths[i][j][k+1]];					
+							diff += paper_costs[edge(paths[i][j][k],paths[i][j][k+1])] / used[paths[i][j][k]][paths[i][j][k+1]];					
 						}
 
 						// if difference is negative we save person and profile number! 
@@ -535,7 +524,7 @@ int main(int argc, char *argv[]) {
 				for (int j = i + 1; j < size; j++){
 					// subtract all costs of the proposed profile from Nash
 					if (used_profile[pr][i][j] > 0) {
-						diff -= learn_costs[edge(i,j)];
+						diff -= paper_costs[edge(i,j)];
 					}
 				}
 			if ( diff < 0) 
@@ -552,10 +541,10 @@ int main(int argc, char *argv[]) {
 
 		// 6.2
 		// Add constraints and solve each time lp. Do this recurivly and use data from which we learnd so far:
-
+		bool dont_proceed = false;
 		cout<<"Start recursion\n";
 		double maximum = 1.5737; // 1.574
-		rec(0, profileOrder, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
+		rec(44, dont_proceed, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum);
 		cout<<"End recursion\n";
 /*		for (int i = 0; i < n_variables; i++) {
 			cout << v_edges[i].get(GRB_StringAttr_VarName) << " "
