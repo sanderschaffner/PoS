@@ -26,7 +26,7 @@ using namespace std;
 //[0,1,],[1,2,],[2,4,],[4,3,],[3,5,],[0,3,],[1,4,],[2,5,]
 //[0,1,0.],[1,2,0.],[2,4,0.],[4,3,0.],[3,5,0.],[0,3,0.],[1,4,0.],[2,5,0.]
 
-typedef double var;
+typedef int constrVar; // constraint type
 
 /*
  * get edge-number depending on vertex-numbers
@@ -61,7 +61,7 @@ int edge(int i, int j){
 		return -1; // gives segfault bc array[-1] doesnt exist
 }
 
-void rec(int number, const vector<unsigned int>& profileOrder, const unsigned int& n_variables, const unsigned int& size, const int& mult_paths, GRBModel& model, GRBVar* v_edges, const vector< vector< vector< int > > >& used_profile, const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile, double& maximum, const vector< vector< vector< int > > >& paths, const vector< vector< int > >& profile_path, const double& one, const double& eps) {
+void rec(int number, const vector<unsigned int>& profileOrder, const unsigned int& n_variables, const unsigned int& size, const int& mult_paths, GRBModel& model, GRBVar* v_edges, const vector< vector< vector< int > > >& used_profile, const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile, constrVar& maximum, const vector< vector< vector< int > > >& paths, const vector< vector< int > >& profile_path, const constrVar& one, const constrVar& eps) {
 	int pr = profileOrder[number];
 	if (pr == mult_paths) {
 		// If we reach this point, we have a new PoS:)
@@ -102,7 +102,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 	int i,j,k;
 	int used[size][size];
 	memset(used,0,sizeof(used));
-	double coef[n_variables];
+	constrVar coef[n_variables];
 	GRBLinExpr path;
 	//int rr = rand()%2;
 	//if (heavy_profile[pr] && rr){
@@ -228,12 +228,10 @@ int main(int argc, char *argv[]) {
 		////////////////////
 		const unsigned int size = 6; // defines how many nodes we have in our graph (also edit this in paths.h)
 		const unsigned int n_variables = 8; // defines the number of edges we have in our graph
-		const double lowerBound = 0.00; // lower bound for Gurobi
-		const double upperBound = GRB_INFINITY; // upper bound for Gurobi
-		const double one = 10;
-		const double eps = 0.00001;
+		const constrVar one = 60000;
+		const constrVar eps = 1;
 		const double learn_costs[n_variables] = {113,277,418,318,0,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
-		double maximum = 1.5737*one; // 1.574, starting point for finding PoS
+		constrVar maximum = 1.57*one; // 1.574, starting point for finding PoS
 
 		/////////////////////
 		// Order of profiles:
@@ -291,11 +289,7 @@ int main(int argc, char *argv[]) {
 		// var_number: note x -> node y
 		// short, direct ones: 0: 0<->1, 1: 1<->2, 2: 2<->4, 3: 3<->4, 4: 3<->5
 		// direct from source to target: 5: 0<->3, 6: 1<->4, 7: 2<->5
-		double lb[n_variables];
-		fill_n(lb, n_variables, lowerBound);
-		double ub[n_variables];
-		fill_n(ub, n_variables, upperBound);
-		GRBVar* v_edges = model.addVars(lb, ub, NULL, NULL, NULL, n_variables);
+		GRBVar* v_edges = model.addVars(n_variables, GRB_INTEGER); // GRB_INTEGER, GRB_CONTINUOUS
 		model.update();
 
 		// 3:
@@ -311,17 +305,18 @@ int main(int argc, char *argv[]) {
 		model.addConstr(v_edges[edge(3,4)] <= v_edges[edge(2,5)]);
 		model.addConstr(v_edges[edge(3,5)] <= v_edges[edge(2,5)]);
 		// Cost of the spanning tree is 1 (optimum has cost one -> result of lp gives directly PoS)
-		GRBLinExpr cost_p1_opt = v_edges[edge(0,1)] + v_edges[edge(1,2)]/2 + v_edges[edge(2,4)]/3;
+/*		GRBLinExpr cost_p1_opt = v_edges[edge(0,1)] + v_edges[edge(1,2)]/2 + v_edges[edge(2,4)]/3;
 		GRBLinExpr cost_p2_opt = v_edges[edge(1,2)]/2 + v_edges[edge(2,4)]/3 + v_edges[edge(3,4)]/2;
 		GRBLinExpr cost_p3_opt = v_edges[edge(2,4)]/3 + v_edges[edge(3,4)]/2 + v_edges[edge(3,5)];
-		model.addConstr(cost_p1_opt + cost_p2_opt + cost_p3_opt == one); // equivalent to: c1+...+c5==1
+		model.addConstr(cost_p1_opt + cost_p2_opt + cost_p3_opt == one); // equivalent to: c1+...+c5==1*/
+		model.addConstr(v_edges[edge(0,1)] + v_edges[edge(1,2)] + v_edges[edge(2,4)] + v_edges[edge(3,4)] + v_edges[edge(3,5)] == one);
 
 		// 4:
 		// Inequalities checking that the edges (0,3) (1,4) and (2,5) give a Nash equilibrium
 		int used[size][size];
 		memset(used, 0, sizeof(used));
 		used[0][3] = used[3][0] = used[1][4] = used[4][1] = used[2][5] = used[5][2] = 1; // used paths in nash
-		double tmp_double;
+		constrVar temp_coef;
 		// go trough all players:
 		for (int i = 0; i < 3; i++){
 			// consider each path for this player:
@@ -334,8 +329,8 @@ int main(int argc, char *argv[]) {
 				// go trough the edges of the path:
 				for (int k = 0; k < paths[i][j].size()-1; k++){
 					//edge we consider is paths[i][j][k],paths[i][j][k+1]
-					tmp_double = one/(used[paths[i][j][k]][paths[i][j][k+1]]+1);
-					temp_expr = temp_expr + tmp_double*v_edges[edge(paths[i][j][k],paths[i][j][k+1])];
+					temp_coef = one/(used[paths[i][j][k]][paths[i][j][k+1]]+1);
+					temp_expr = temp_expr + temp_coef*v_edges[edge(paths[i][j][k],paths[i][j][k+1])];
 					cout << "  +  " << one/(used[paths[i][j][k]][paths[i][j][k+1]]+1) << " * " << edge(paths[i][j][k],paths[i][j][k+1]);
 				}
 				// add constraint: nesh_path < all possible alternatives
