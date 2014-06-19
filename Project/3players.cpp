@@ -15,6 +15,8 @@ using namespace std;
 
 //without eps
 //highest nesh: wrong: [0,1,0.136364],[1,2,0.237013],[2,4,0.37013],[4,3,0.256494],[3,5,0],[0,3,0.506494],[1,4,0.493506],[2,5,0.626623]
+//mult by 1000000: [0,1,136364],[1,2,237013],[2,4,370130],[4,3,256494],[3,5,0],[0,3,506494],[1,4,493506],[2,5,626623]
+
 //lower nesh: wrong: [0,1,0.0997831],[1,2,0.247289],[2,4,0.370933],[4,3,0.281996],[3,5,0],[0,3,0.488069],[1,4,0.494577],[2,5,0.591106]
 //[0,3],[1,4],[2,5]
 
@@ -228,16 +230,16 @@ int main(int argc, char *argv[]) {
 		const unsigned int n_variables = 8; // defines the number of edges we have in our graph
 		const double lowerBound = 0.00; // lower bound for Gurobi
 		const double upperBound = GRB_INFINITY; // upper bound for Gurobi
-		const double one = 1;
-		const double eps = 0.00000;
-
+		const double one = 10;
+		const double eps = 0.00001;
 		const double learn_costs[n_variables] = {113,277,418,318,0,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
+		double maximum = 1.5737*one; // 1.574, starting point for finding PoS
 
 		/////////////////////
 		// Order of profiles:
 		/////////////////////
-		unsigned int numberOfChanges = 2; // number of profiles accounted for in next line
-		unsigned int first[] = {44,104}; // write here the profiles which have to be consiered first!
+		unsigned int numberOfChanges = 3; // number of profiles accounted for in next line
+		unsigned int first[] = {44,104,19}; // write here the profiles which have to be consiered first!
 
 		///////////////////////////////////////////////////////////
 		// Create Graph and find all possible paths for each player
@@ -312,7 +314,7 @@ int main(int argc, char *argv[]) {
 		GRBLinExpr cost_p1_opt = v_edges[edge(0,1)] + v_edges[edge(1,2)]/2 + v_edges[edge(2,4)]/3;
 		GRBLinExpr cost_p2_opt = v_edges[edge(1,2)]/2 + v_edges[edge(2,4)]/3 + v_edges[edge(3,4)]/2;
 		GRBLinExpr cost_p3_opt = v_edges[edge(2,4)]/3 + v_edges[edge(3,4)]/2 + v_edges[edge(3,5)];
-		model.addConstr(cost_p1_opt + cost_p2_opt + cost_p3_opt == 1); // equivalent to: c1+...+c5==1
+		model.addConstr(cost_p1_opt + cost_p2_opt + cost_p3_opt == one); // equivalent to: c1+...+c5==1
 
 		// 4:
 		// Inequalities checking that the edges (0,3) (1,4) and (2,5) give a Nash equilibrium
@@ -446,11 +448,11 @@ int main(int argc, char *argv[]) {
 			}
 			if( notIn ) profileOrder.push_back(i);
 		}
-		cout << mult_paths << profileOrder.size() << endl;
+		/*cout << mult_paths << profileOrder.size() << endl;
 		for(int i = 0; i < profileOrder.size(); i++){
 			cout<< profileOrder[i]<<" ";
 		}
-		cout << endl;
+		cout << endl;*/
 
 		// 6:
 		// Till now we have that |N| is Nash and direct line is min. But |N| is not yet min |N|
@@ -504,9 +506,9 @@ int main(int argc, char *argv[]) {
 							used[paths[i][t][k]][paths[i][t][k+1]]--;
 							used[paths[i][t][k+1]][paths[i][t][k]]--;
 						}
-						/*if (pr==31){
-							cout << "Diff of profile = " << pr << " before adding: " << diff << endl;
-						}*/
+						//if (pr==31){
+						//	cout << "Diff of profile = " << pr << " before adding: " << diff << endl;
+						//}
 						// and now insert the new 
 						for (k = 0; k < paths[i][j].size() - 1; k++){
 							// FIRST update used
@@ -517,14 +519,14 @@ int main(int argc, char *argv[]) {
 						}
 
 						// if difference is negative we save person and profile number! 
-						//if (diff < 0){
+						if (diff < 0){
 							if (pr > 0)
 								//cout << "Profile = " << pr << ".  " << i << " guy wants to change to " << j << "-th strategy  " << "and diff is " << diff << endl;
 							which_guy.push_back(pr);
 							which_guy.push_back(i);
 							which_strategy.push_back(pr);
 							which_strategy.push_back(j);
-						//}					
+						}					
 					}
 				}
 			}
@@ -553,8 +555,8 @@ int main(int argc, char *argv[]) {
 		// 6.2
 		// Add constraints and solve each time lp. Do this recurivly and use data from which we learnd so far:
 
+		cout<<"heavy profile at nr 19: "<<heavy_profile[19]<<endl;
 		cout<<"Start recursion\n";
-		double maximum = 1.5737; // 1.574
 		rec(0, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
 		cout<<"End recursion\n";
 /*		for (int i = 0; i < n_variables; i++) {

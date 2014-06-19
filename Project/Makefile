@@ -6,7 +6,7 @@ CPPLIB   = -L/opt/gurobi562/linux64/lib/ -lgurobi_c++ -lgurobi56
 
 all: 3players 3players_v0
 
-run: run_3players run_v0
+run: run_3players
 
 3players :
 	$(CPP) $(CARGS) -o 3players 3players.cpp -I$(INC) $(CPPLIB) -lpthread -lm
