@@ -104,8 +104,8 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 	memset(used,0,sizeof(used));
 	constrVar coef[n_variables];
 	GRBLinExpr path;
-	//int rr = rand()%2;
-	//if (heavy_profile[pr] && rr){
+
+	// only valid for learning:
 	if (heavy_profile[pr]){
 		memset(coef, 0, sizeof(coef));
 		coef[edge(0,3)] = coef[edge(1,4)] = coef[edge(2,5)] = 1; // start with nash
@@ -147,6 +147,8 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 		model.remove(constr);
 		return;
 	}
+
+
 	int count = 0;
 	vector<int> tmp;
 	vector<int> tmp2;
@@ -158,7 +160,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 			tmp2.push_back(which_strategy[i+1]);
 		}
 	}
-	srand (time(NULL));
+	//srand (time(NULL));
 	//int tt = rand()%count;// i: seed one each time
 	//int a[2] = {rand()%count,rand()%count}; // ii: seed 2 each time
 	//for (int n=0;n<2;n++){
@@ -230,7 +232,7 @@ int main(int argc, char *argv[]) {
 		const unsigned int n_variables = 8; // defines the number of edges we have in our graph
 		const constrVar one = 60000;
 		const constrVar eps = 1;
-		bool learning = true;
+		bool learning = false;
 		const double learn_costs[n_variables] = {113,277,418,318,0,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
 		constrVar maximum = 1.57*one; // 1.574, starting point for finding PoS
 
@@ -239,6 +241,7 @@ int main(int argc, char *argv[]) {
 		/////////////////////
 		unsigned int numberOfChanges = 3; // number of profiles accounted for in next line
 		unsigned int first[] = {44,104,19}; // write here the profiles which have to be consiered first!
+		//unsigned int ignor[] = {4,6,9,12,13,15,17,18,20,21,24,25,26,27,30,31,34,35,37,38,40,42,45,46,48,49,53,54,65,68,69,70,73,74,78,79,80,81,84,85,86,89,91,93,94,96,98,99,101,102,111,112,113,114,115,116,117,120,123,124};
 
 		///////////////////////////////////////////////////////////
 		// Create Graph and find all possible paths for each player
@@ -565,10 +568,14 @@ int main(int argc, char *argv[]) {
 			cout << which_strategy[i] << " " << which_strategy[i+1] << endl;
 		}*/
 
+/*			for(int j = 0; j < 60; j++){
+				heavy_profile[ignor[j]] = 1;
+			}*/
+
 		// 6.2
 		// Add constraints and solve each time lp. Do this recurivly and use data from which we learnd so far:
 
-		cout<<"heavy profile at nr 19: "<<heavy_profile[19]<<endl;
+		//cout<<"heavy profile at nr 19: "<<heavy_profile[19]<<endl;
 		cout<<"Start recursion\n";
 		rec(0, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
 		cout<<"End recursion\n";
