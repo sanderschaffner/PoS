@@ -230,6 +230,7 @@ int main(int argc, char *argv[]) {
 		const unsigned int n_variables = 8; // defines the number of edges we have in our graph
 		const constrVar one = 60000;
 		const constrVar eps = 1;
+		bool learning = true;
 		const double learn_costs[n_variables] = {113,277,418,318,0,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
 		constrVar maximum = 1.57*one; // 1.574, starting point for finding PoS
 
@@ -385,7 +386,7 @@ int main(int argc, char *argv[]) {
 						used_profile[profile][paths[2][i2][k+1]][paths[2][i2][k]]++;
 					}
 					// Print out one used_profile and the paths beloging to it
-					if (i0==0 && i1==3 && i2==4){
+/*					if (i0==0 && i1==3 && i2==4){
 						cout<<profile<<"\n";
 						for (int ii=0;ii<6;ii++){
 							for (int jj=0;jj<6;jj++)
@@ -402,7 +403,7 @@ int main(int argc, char *argv[]) {
 						for(int bl=0; bl < paths[2][i2].size();bl++ )
 							cout<<paths[2][i2][bl];
 						cout<<endl;
-					}	
+					}*/	
 					profile_path[0][profile] = i0;
 					profile_path[1][profile] = i1;
 					profile_path[2][profile] = i2;
@@ -492,62 +493,71 @@ int main(int argc, char *argv[]) {
 			for (int i = 0; i < 3; i++){
 				// i-th guy wants to deviate
 				for (int j = 0; j < paths_pp[i]; j++){
-					// to the j-th strategy
-					// therefore the path used in this profile (== profile_path[i][pr]) should not be j itself (else we have no change!)
-					if (j != profile_path[i][pr]){
-						// go trough whole used[][] and make a copy of the previous used_profile we already have computed
-						for (int ii = 0; ii < size; ii++)
-							for (int jj = 0; jj < size; jj++)
-								used[ii][jj] = used_profile[pr][ii][jj];
-						int t = profile_path[i][pr]; // path of i-th player in strategy pr which was considered and shall be changed!
-						diff = 0;
-						// now subtract from used t = profile_path[i][pr] (old) strategy and insert j-th (new) strategy instead
-						for (k = 0; k < paths[i][t].size() - 1; k++){
-							// subtract from diff all edge-costs of path t and weight it apropriate
-							diff -= learn_costs[edge(paths[i][t][k],paths[i][t][k+1])] / used[paths[i][t][k]][paths[i][t][k+1]];
-							// get ridd of path t in used
-							used[paths[i][t][k]][paths[i][t][k+1]]--;
-							used[paths[i][t][k+1]][paths[i][t][k]]--;
-						}
-						//if (pr==31){
-						//	cout << "Diff of profile = " << pr << " before adding: " << diff << endl;
-						//}
-						// and now insert the new 
-						for (k = 0; k < paths[i][j].size() - 1; k++){
-							// FIRST update used
-							used[paths[i][j][k]][paths[i][j][k+1]]++;
-							used[paths[i][j][k+1]][paths[i][j][k]]++;
-							// and then add costs
-							diff += learn_costs[edge(paths[i][j][k],paths[i][j][k+1])] / used[paths[i][j][k]][paths[i][j][k+1]];					
-						}
+					if(learning) {
+						// to the j-th strategy
+						// therefore the path used in this profile (== profile_path[i][pr]) should not be j itself (else we have no change!)
+						if (j != profile_path[i][pr]){
+							// go trough whole used[][] and make a copy of the previous used_profile we already have computed
+							for (int ii = 0; ii < size; ii++)
+								for (int jj = 0; jj < size; jj++)
+									used[ii][jj] = used_profile[pr][ii][jj];
+							int t = profile_path[i][pr]; // path of i-th player in strategy pr which was considered and shall be changed!
+							diff = 0;
+							// now subtract from used t = profile_path[i][pr] (old) strategy and insert j-th (new) strategy instead
+							for (k = 0; k < paths[i][t].size() - 1; k++){
+								// subtract from diff all edge-costs of path t and weight it apropriate
+								diff -= learn_costs[edge(paths[i][t][k],paths[i][t][k+1])] / used[paths[i][t][k]][paths[i][t][k+1]];
+								// get ridd of path t in used
+								used[paths[i][t][k]][paths[i][t][k+1]]--;
+								used[paths[i][t][k+1]][paths[i][t][k]]--;
+							}
+							//if (pr==31){
+							//	cout << "Diff of profile = " << pr << " before adding: " << diff << endl;
+							//}
+							// and now insert the new 
+							for (k = 0; k < paths[i][j].size() - 1; k++){
+								// FIRST update used
+								used[paths[i][j][k]][paths[i][j][k+1]]++;
+								used[paths[i][j][k+1]][paths[i][j][k]]++;
+								// and then add costs
+								diff += learn_costs[edge(paths[i][j][k],paths[i][j][k+1])] / used[paths[i][j][k]][paths[i][j][k+1]];					
+							}
 
-						// if difference is negative we save person and profile number! 
-						if (diff < 0){
-							if (pr > 0)
-								//cout << "Profile = " << pr << ".  " << i << " guy wants to change to " << j << "-th strategy  " << "and diff is " << diff << endl;
-							which_guy.push_back(pr);
-							which_guy.push_back(i);
-							which_strategy.push_back(pr);
-							which_strategy.push_back(j);
-						}					
+							// if difference is negative we save person and profile number! 
+							if (diff < 0){
+								if (pr > 0)
+									//cout << "Profile = " << pr << ".  " << i << " guy wants to change to " << j << "-th strategy  " << "and diff is " << diff << endl;
+								which_guy.push_back(pr);
+								which_guy.push_back(i);
+								which_strategy.push_back(pr);
+								which_strategy.push_back(j);
+							}					
+						}
+					} else {
+						which_guy.push_back(pr);
+						which_guy.push_back(i);
+						which_strategy.push_back(pr);
+						which_strategy.push_back(j);
 					}
 				}
 			}
 
-			diff = paper_nash;
-			// go trough used_profile which has not changed!
-			for (int i = 0; i < size; i++)
-				for (int j = i + 1; j < size; j++){
-					// subtract all costs of the proposed profile from Nash
-					if (used_profile[pr][i][j] > 0) {
-						diff -= learn_costs[edge(i,j)];
+			if(learning) {
+				diff = paper_nash;
+				// go trough used_profile which has not changed!
+				for (int i = 0; i < size; i++)
+					for (int j = i + 1; j < size; j++){
+						// subtract all costs of the proposed profile from Nash
+						if (used_profile[pr][i][j] > 0) {
+							diff -= learn_costs[edge(i,j)];
+						}
 					}
+				if ( diff < 0) 
+				{
+					// Nash is smaller than proposed edges of profile
+					//cout << pr <<"-th strategy profile is sligtly heavier than Nash and the difference is "<< diff << endl;
+					heavy_profile[pr] = 1;
 				}
-			if ( diff < 0) 
-			{
-				// Nash is smaller than proposed edges of profile
-				//cout << pr <<"-th strategy profile is sligtly heavier than Nash and the difference is "<< diff << endl;
-				heavy_profile[pr] = 1;
 			}
 		}
 		cout << "We found " << which_guy.size()/2 << " changes we want to have a closer look on" <<endl;
