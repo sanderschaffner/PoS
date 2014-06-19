@@ -441,9 +441,17 @@ int main(int argc, char *argv[]) {
 			for(int j = 0; j < numberOfChanges; j++){
 				if(i == first[j]) notIn = false;
 			}
+			for(int j = 0; j < expensive.size(); j++){
+				if(i == expensive[j]) notIn = false;
+			}
 			if( notIn ) profileOrder.push_back(i);
 		}
-		/*cout << mult_paths << profileOrder.size() << endl;
+/*		cout << "expensive:" << endl;
+		for(int i = 0; i < expensive.size(); i++){
+			cout<< expensive[i]<<" ";
+		}
+		cout << endl;
+		cout << mult_paths << endl;
 		for(int i = 0; i < profileOrder.size(); i++){
 			cout<< profileOrder[i]<<" ";
 		}
