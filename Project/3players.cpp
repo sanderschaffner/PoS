@@ -148,7 +148,37 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 		return;
 	}
 
+	// 2 Cases:
+	// i: profile > nash
+	// ii: player x wants to deviate from i to j
 
+	// CASE I
+	// profile > nash
+	memset(coef, 0, sizeof(coef));
+	coef[edge(0,3)] = coef[edge(1,4)] = coef[edge(2,5)] = 1; // start with nash
+	for (i=0;i<size;i++){
+		for (j=i+1;j<size;j++){
+			if (used_profile[pr][i][j]>0) coef[edge(i,j)]-=1;
+		}
+	}
+	for (k=0;k<n_variables;k++){
+		if(coef[k]!=0) path = path + coef[k]*v_edges[k];
+	}
+	// Constraint tells: |N|<|S_i|
+	GRBConstr constr = model.addConstr(path <= 0);
+	model.optimize();
+
+	int optimstatus = model.get(GRB_IntAttr_Status);
+	if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
+		if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
+			rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
+		}				
+	}
+	// delete added constr:
+	model.remove(constr);
+
+	// CASE II
+	// player x wants to deviate from i to j
 	int count = 0;
 	vector<int> tmp;
 	vector<int> tmp2;
