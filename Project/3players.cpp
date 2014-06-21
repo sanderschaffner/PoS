@@ -44,18 +44,16 @@ int edge(int i, int j){
 		return 0;
 	else if (i==1 && j==2)
 		return 1;
-	else if (i==2 && j==4)
+	else if (i==2 && j==3)
 		return 2;
 	else if (i==3 && j==4)
 		return 3;
-	else if (i==3 && j==5)
+	else if (i==0 && j==4)
 		return 4;
-	else if (i==0 && j==3)
+	else if (i==1 && j==3)
 		return 5;
-	else if (i==1 && j==4)
+	else if (i==2 && j==4)
 		return 6;
-	else if (i==2 && j==5)
-		return 7;
 	else
 		cout << "Edge not defined! i = " << i << ", j = " << j << endl;
 		return -1; // gives segfault bc array[-1] doesnt exist
@@ -72,15 +70,14 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 		}
 		cout << "for python script: [0,1,"<<v_edges[0].get(GRB_DoubleAttr_X)<<
 				"],[1,2,"<<v_edges[1].get(GRB_DoubleAttr_X)<<
-				"],[2,4,"<<v_edges[2].get(GRB_DoubleAttr_X)<<
-				"],[4,3,"<<v_edges[3].get(GRB_DoubleAttr_X)<<
-				"],[3,5,"<<v_edges[4].get(GRB_DoubleAttr_X)<<
-				"],[0,3,"<<v_edges[5].get(GRB_DoubleAttr_X)<<
-				"],[1,4,"<<v_edges[6].get(GRB_DoubleAttr_X)<<
-				"],[2,5,"<<v_edges[7].get(GRB_DoubleAttr_X)<<
+				"],[2,3,"<<v_edges[2].get(GRB_DoubleAttr_X)<<
+				"],[3,4,"<<v_edges[3].get(GRB_DoubleAttr_X)<<
+				"],[0,4,"<<v_edges[4].get(GRB_DoubleAttr_X)<<
+				"],[1,3,"<<v_edges[5].get(GRB_DoubleAttr_X)<<
+				"],[2,4,"<<v_edges[6].get(GRB_DoubleAttr_X)<<
 				"]"<<endl;
 
-		cout << "Straight line:" << endl;
+/*		cout << "Straight line:" << endl;
 		cout << "cost p1 on opt: " << v_edges[0].get(GRB_DoubleAttr_X)+v_edges[1].get(GRB_DoubleAttr_X)/2+v_edges[2].get(GRB_DoubleAttr_X)/3+v_edges[3].get(GRB_DoubleAttr_X)/2 << endl;
 		cout << "cost p2 on opt: " << v_edges[1].get(GRB_DoubleAttr_X)/2+v_edges[2].get(GRB_DoubleAttr_X)/3 << endl;
 		cout << "cost p3 on opt: " << v_edges[2].get(GRB_DoubleAttr_X)/3+v_edges[3].get(GRB_DoubleAttr_X)/2+v_edges[4].get(GRB_DoubleAttr_X) << endl;
@@ -88,7 +85,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 		cout << "Player 1 goes N (0,3) others straight line:" << endl;
 		cout << "cost p1: " << v_edges[5].get(GRB_DoubleAttr_X) << endl;
 		cout << "cost p2 straight: " << v_edges[1].get(GRB_DoubleAttr_X)+v_edges[2].get(GRB_DoubleAttr_X)/2 << endl;
-		cout << "cost p3 straight: " << v_edges[2].get(GRB_DoubleAttr_X)/2+v_edges[3].get(GRB_DoubleAttr_X)+v_edges[4].get(GRB_DoubleAttr_X) << endl;
+		cout << "cost p3 straight: " << v_edges[2].get(GRB_DoubleAttr_X)/2+v_edges[3].get(GRB_DoubleAttr_X)+v_edges[4].get(GRB_DoubleAttr_X) << endl;*/
 
 		maximum = model.get(GRB_DoubleAttr_ObjVal);
 		cout << "PoS: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
@@ -108,7 +105,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 	// only valid for learning:
 	if (heavy_profile[pr]){
 		memset(coef, 0, sizeof(coef));
-		coef[edge(0,3)] = coef[edge(1,4)] = coef[edge(2,5)] = 1; // start with nash
+		coef[edge(0,4)] = coef[edge(1,3)] = coef[edge(2,4)] = 1; // start with nash
 		for (i=0;i<size;i++){
 			for (j=i+1;j<size;j++){
 				if (used_profile[pr][i][j]>0) coef[edge(i,j)]-=1;
@@ -156,7 +153,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 		// CASE I
 		// profile > nash
 		memset(coef, 0, sizeof(coef));
-		coef[edge(0,3)] = coef[edge(1,4)] = coef[edge(2,5)] = 1; // start with nash
+		coef[edge(0,4)] = coef[edge(1,3)] = coef[edge(2,4)] = 1; // start with nash
 		for (i=0;i<size;i++){
 			for (j=i+1;j<size;j++){
 				if (used_profile[pr][i][j]>0) coef[edge(i,j)]-=1;
@@ -171,6 +168,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 
 		int optimstatus = model.get(GRB_IntAttr_Status);
 		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
+			cout << pr << " " << maximum << endl;
 			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
 				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning);
 			}				
@@ -329,20 +327,20 @@ int main(int argc, char *argv[]) {
 		////////////////////
 		// Variables to set:
 		////////////////////
-		const unsigned int size = 6; // defines how many nodes we have in our graph (also edit this in paths.h)
-		const unsigned int n_variables = 8; // defines the number of edges we have in our graph
+		const unsigned int size = 5; // defines how many nodes we have in our graph (also edit this in paths.h)
+		const unsigned int n_variables = 7; // defines the number of edges we have in our graph
 		const constrVar one = 60000;
 		const constrVar eps = 1;
 		const unsigned int alternative_paths = 0; // alternative paths to consider in rec: 0 -> all, 1,..,n -> random subset in each call
 		const bool learning = true;
-		const double learn_costs[n_variables] = {113,277,418,318,0,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
-		constrVar maximum = 1.3*one; // 1.57, starting point for finding PoS
+		const double learn_costs[n_variables] = {113,277,418,318,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
+		constrVar maximum = 1.5*one; // 1.57, starting point for finding PoS
 
 		/////////////////////
 		// Order of profiles:
 		/////////////////////
-		unsigned int numberOfChanges = 3; // number of profiles accounted for in next line
-		unsigned int first[] = {44,104,19}; // write here the profiles which have to be consiered first!
+		unsigned int numberOfChanges = 7; // number of profiles accounted for in next line
+		unsigned int first[] = {40,68,14,18,17,16,15,13}; // write here the profiles which have to be consiered first!
 		//unsigned int ignor[] = {4,6,9,12,13,15,17,18,20,21,24,25,26,27,30,31,34,35,37,38,40,42,45,46,48,49,53,54,65,68,69,70,73,74,78,79,80,81,84,85,86,89,91,93,94,96,98,99,101,102,111,112,113,114,115,116,117,120,123,124};
 
 		///////////////////////////////////////////////////////////
@@ -361,16 +359,16 @@ int main(int argc, char *argv[]) {
 		}
 		//unsigned int graph[size][size];
 		//memset(graph, 0, sizeof(graph));
-		graph[0][1] = 1; graph[1][2] = 1; graph[2][4] = 1; graph[3][4] = 1; graph[3][5] = 1;
-		graph[1][0] = 1; graph[2][1] = 1; graph[4][2] = 1; graph[4][3] = 1; graph[5][3] = 1;
-		graph[0][3] = 1; graph[1][4] = 1; graph[2][5] = 1;
-		graph[3][0] = 1; graph[4][1] = 1; graph[5][2] = 1;
+		graph[0][1] = 1; graph[1][2] = 1; graph[2][3] = 1; graph[3][4] = 1;
+		graph[1][0] = 1; graph[2][1] = 1; graph[3][2] = 1; graph[4][3] = 1;
+		graph[0][4] = 1; graph[1][3] = 1; graph[2][4] = 1;
+		graph[4][0] = 1; graph[3][1] = 1; graph[4][2] = 1;
 
 		// 2:
 		// Get all possible paths for each player in the graph
-		Paths paths_p1(0,3,size); // source, target
-		Paths paths_p2(1,4,size); // source, target
-		Paths paths_p3(2,5,size); // source, target
+		Paths paths_p1(0,4,size); // source, target
+		Paths paths_p2(1,3,size); // source, target
+		Paths paths_p3(2,4,size); // source, target
 		paths_p1.getAllPaths(graph);
 		paths_p2.getAllPaths(graph);
 		paths_p3.getAllPaths(graph);
@@ -401,36 +399,41 @@ int main(int argc, char *argv[]) {
 		// 3:
 		// Inequalities saying that the minimum spanning tree is the line (optimum=={0to1to2to4to3to5})
 		// So direct source to target paths have to be bigger than short ones
-		model.addConstr(v_edges[edge(0,1)] <= v_edges[edge(0,3)]);
-		model.addConstr(v_edges[edge(1,2)] <= v_edges[edge(0,3)]);
-		model.addConstr(v_edges[edge(2,4)] <= v_edges[edge(0,3)]);
-		model.addConstr(v_edges[edge(3,4)] <= v_edges[edge(0,3)]);
-		model.addConstr(v_edges[edge(1,2)] <= v_edges[edge(1,4)]);
-		model.addConstr(v_edges[edge(2,4)] <= v_edges[edge(1,4)]);
-		model.addConstr(v_edges[edge(2,4)] <= v_edges[edge(2,5)]);
-		model.addConstr(v_edges[edge(3,4)] <= v_edges[edge(2,5)]);
-		model.addConstr(v_edges[edge(3,5)] <= v_edges[edge(2,5)]);
+		model.addConstr(v_edges[edge(0,1)] <= v_edges[edge(0,4)]);
+		model.addConstr(v_edges[edge(1,2)] <= v_edges[edge(0,4)]);
+		model.addConstr(v_edges[edge(2,3)] <= v_edges[edge(0,4)]);
+		model.addConstr(v_edges[edge(3,4)] <= v_edges[edge(0,4)]);
+		model.addConstr(v_edges[edge(1,2)] <= v_edges[edge(1,3)]);
+		model.addConstr(v_edges[edge(2,3)] <= v_edges[edge(1,3)]);
+		model.addConstr(v_edges[edge(2,3)] <= v_edges[edge(2,4)]);
+		model.addConstr(v_edges[edge(3,4)] <= v_edges[edge(2,4)]);
 		// Cost of the spanning tree is 1 (optimum has cost one -> result of lp gives directly PoS)
 /*		GRBLinExpr cost_p1_opt = v_edges[edge(0,1)] + v_edges[edge(1,2)]/2 + v_edges[edge(2,4)]/3;
 		GRBLinExpr cost_p2_opt = v_edges[edge(1,2)]/2 + v_edges[edge(2,4)]/3 + v_edges[edge(3,4)]/2;
 		GRBLinExpr cost_p3_opt = v_edges[edge(2,4)]/3 + v_edges[edge(3,4)]/2 + v_edges[edge(3,5)];
 		model.addConstr(cost_p1_opt + cost_p2_opt + cost_p3_opt == one); // equivalent to: c1+...+c5==1*/
-		model.addConstr(v_edges[edge(0,1)] + v_edges[edge(1,2)] + v_edges[edge(2,4)] + v_edges[edge(3,4)] + v_edges[edge(3,5)] == one);
+		model.addConstr(v_edges[edge(0,1)] + v_edges[edge(1,2)] + v_edges[edge(2,3)] + v_edges[edge(3,4)] == one);
 
 		// 4:
 		// Inequalities checking that the edges (0,3) (1,4) and (2,5) give a Nash equilibrium
 		int used[size][size];
 		memset(used, 0, sizeof(used));
-		used[0][3] = used[3][0] = used[1][4] = used[4][1] = used[2][5] = used[5][2] = 1; // used paths in nash
+		used[0][4] = used[4][0] = used[1][3] = used[3][1] = used[2][4] = used[4][2] = 1; // used paths in nash
 		constrVar temp_coef;
 		// go trough all players:
 		for (int i = 0; i < 3; i++){
+			int x;
 			// consider each path for this player:
 			// !! attention: we start with j==1 since we know that in paths[i][0][k] we have the nash_path
 			// !! this is true here since we DECIDED that the direct way from source to target shall be our nash_path
 			// !! and the class Paths finds us this path first (if it exists in graph!)
 			for (int j = 1; j < paths[i].size(); j++){
-				cout << edge(i,i+3) << "    <    ";
+				if( i == 0 || i == 2 ) {
+					x = 4;
+				} else {
+					x = 3;
+				}
+				cout << edge(i,x) << "    <    ";
 				GRBLinExpr temp_expr;
 				// go trough the edges of the path:
 				for (int k = 0; k < paths[i][j].size()-1; k++){
@@ -440,7 +443,7 @@ int main(int argc, char *argv[]) {
 					cout << "  +  " << one/(used[paths[i][j][k]][paths[i][j][k+1]]+1) << " * " << edge(paths[i][j][k],paths[i][j][k+1]);
 				}
 				// add constraint: nesh_path < all possible alternatives
-				model.addConstr(v_edges[edge(i,i+3)] <= temp_expr);
+				model.addConstr(v_edges[edge(i,x)] <= temp_expr);
 				cout<<"\n";
 				
 			}
@@ -514,7 +517,7 @@ int main(int argc, char *argv[]) {
 					profile_path[2][profile] = i2;
 
 					// If the Nash-edges are part of the profile, we know for sure that: |S_i| >= |Nash| -> usefull later
-					if (used_profile[profile][0][3]>0 && used_profile[profile][1][4]>0 && used_profile[profile][2][5]>0)
+					if (used_profile[profile][0][4]>0 && used_profile[profile][1][3]>0 && used_profile[profile][2][4]>0)
 					{
 						expensive.push_back(profile);
 					}
@@ -553,6 +556,7 @@ int main(int argc, char *argv[]) {
 			if( notIn ) profileOrder.push_back(i);
 		}
 		cout << "We go trough " << profileOrder.size()-1 << " profiles and consider " << alternative_paths << " alternative paths in each call (0 == all)" << endl;
+		cout << "Learning is " << learning << endl;
 /*		cout << "expensive:" << endl;
 		for(int i = 0; i < expensive.size(); i++){
 			cout<< expensive[i]<<" ";
@@ -573,7 +577,7 @@ int main(int argc, char *argv[]) {
 		// Goal: We want to constrain the lp s.t. |N| is smallest Nash and all other |S_i| are either bigger than |N| or NOT Nash. We therefore maximize |N|
 
 		// set objective: maximize Nash (yet not minimal Nash):
-		model.setObjective( v_edges[edge(0,3)] + v_edges[edge(1,4)] + v_edges[edge(2,5)] , GRB_MAXIMIZE);
+		model.setObjective( v_edges[edge(0,4)] + v_edges[edge(1,3)] + v_edges[edge(2,4)] , GRB_MAXIMIZE);
 
 		// Optimize model and look at result -> not yet min Nash
 		/*model.optimize();
@@ -587,7 +591,7 @@ int main(int argc, char *argv[]) {
 		// learning from paper example:
 		// go trough all profiles and decide if it is worth to have a closer look according to the exaple out of the paper
 		// if in the new strategie the costs increas according to learn_costs (an therefore diff is pos) we won't consider it
-		const double paper_nash = learn_costs[edge(0,3)] + learn_costs[edge(1,4)] + learn_costs[edge(2,5)];
+		const double paper_nash = learn_costs[edge(0,4)] + learn_costs[edge(1,3)] + learn_costs[edge(2,4)];
 		double diff = 0; // difference 
 		int pr; // profile number which we are looking at
 		vector<int> which_guy; // first profile, than guy
