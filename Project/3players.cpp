@@ -192,10 +192,20 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 	}
 	//srand (time(NULL));
 	//int tt = rand()%count;// i: seed one each time
-	//int a[2] = {rand()%count,rand()%count}; // ii: seed 2 each time
-	//for (int n=0;n<2;n++){
-	//	int tt = a[n];
-	for (int tt=0;tt<tmp.size();tt++){ // iii: seed all
+	int n_seed = 3; // ii: seed n each time
+	std::vector<int> myvector;
+	for (int numb = 0; numb < count; numb++) myvector.push_back(numb);
+	int a[n_seed];
+	int counter = count;
+	for(int w = 0; w < n_seed; w++){
+		int del = rand()%counter;
+		a[w] = myvector[del];
+		myvector.erase(myvector.begin()+del);
+		counter--;
+	}
+	for (int n=0;n<n_seed;n++){
+		int tt = a[n];
+	//for (int tt=0;tt<tmp.size();tt++){ // iii: seed all
 		i = tmp[tt]; // guy
 		j = tmp2[tt]; // strategy
 		//cout<<pr<<"  "<<i<<"  "<<j<<"\n"; 
@@ -230,7 +240,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 			if(coef[k]!=0) path2 = path2 + v_edges[k]*coef[k];
 		}
 		//cout<<"\n";
-		GRBConstr constr = model.addConstr(path2 <= 0-eps);
+		GRBConstr constr2 = model.addConstr(path2 <= 0-eps);
 		//cout<<pr<<"   "<<constraint<<" \n\n";
 		model.optimize();
 /*		if(model.get(GRB_DoubleAttr_ObjVal)>1.63) {
@@ -241,15 +251,15 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 		}
 		cout<<pr<<"  :)  "<<model.get(GRB_DoubleAttr_ObjVal)<<"\n";*/
 
-		int optimstatus = model.get(GRB_IntAttr_Status);
-		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
+		int optimstatus2 = model.get(GRB_IntAttr_Status);
+		if (optimstatus2 != GRB_INF_OR_UNBD && optimstatus2 != GRB_INFEASIBLE) {
 			//cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << " " << maximum << endl;
 			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
 				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
 			}	
 		}
 		// delete added constr:
-		model.remove(constr);
+		model.remove(constr2);
 	} // for ii and iii
 }
 
@@ -264,7 +274,7 @@ int main(int argc, char *argv[]) {
 		const constrVar eps = 1;
 		bool learning = false;
 		const double learn_costs[n_variables] = {113,277,418,318,0,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
-		constrVar maximum = 1.57*one; // 1.574, starting point for finding PoS
+		constrVar maximum = 1.3*one; // 1.57, starting point for finding PoS
 
 		/////////////////////
 		// Order of profiles:
@@ -567,10 +577,12 @@ int main(int argc, char *argv[]) {
 							}					
 						}
 					} else {
-						which_guy.push_back(pr);
-						which_guy.push_back(i);
-						which_strategy.push_back(pr);
-						which_strategy.push_back(j);
+						if (j != profile_path[i][pr]){
+							which_guy.push_back(pr);
+							which_guy.push_back(i);
+							which_strategy.push_back(pr);
+							which_strategy.push_back(j);
+						}
 					}
 				}
 			}
