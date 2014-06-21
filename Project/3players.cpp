@@ -67,7 +67,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 		// If we reach this point, we have a new PoS:)
 
 		model.optimize();
-		for (int i = 0; i < 8; i++) {
+		for (int i = 0; i < n_variables; i++) {
 			cout << v_edges[i].get(GRB_StringAttr_VarName) << " " << v_edges[i].get(GRB_DoubleAttr_X) << endl;
 		}
 		cout << "for python script: [0,1,"<<v_edges[0].get(GRB_DoubleAttr_X)<<
@@ -190,7 +190,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 			tmp2.push_back(which_strategy[i+1]);
 		}
 	}
-	//srand (time(NULL));
+	srand (time(NULL));
 	//int tt = rand()%count;// i: seed one each time
 	int n_seed = 3; // ii: seed n each time
 	std::vector<int> myvector;
@@ -490,6 +490,7 @@ int main(int argc, char *argv[]) {
 			}
 			if( notIn ) profileOrder.push_back(i);
 		}
+		cout << "We go trough " << profileOrder.size()-1 << " profiles" << endl;
 /*		cout << "expensive:" << endl;
 		for(int i = 0; i < expensive.size(); i++){
 			cout<< expensive[i]<<" ";
