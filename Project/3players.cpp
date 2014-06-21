@@ -61,7 +61,7 @@ int edge(int i, int j){
 		return -1; // gives segfault bc array[-1] doesnt exist
 }
 
-void rec(int number, const vector<unsigned int>& profileOrder, const unsigned int& n_variables, const unsigned int& size, const int& mult_paths, GRBModel& model, GRBVar* v_edges, const vector< vector< vector< int > > >& used_profile, const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile, constrVar& maximum, const vector< vector< vector< int > > >& paths, const vector< vector< int > >& profile_path, const constrVar& one, const constrVar& eps) {
+void rec(int number, const vector<unsigned int>& profileOrder, const unsigned int& n_variables, const unsigned int& size, const int& mult_paths, GRBModel& model, GRBVar* v_edges, const vector< vector< vector< int > > >& used_profile, const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile, constrVar& maximum, const vector< vector< vector< int > > >& paths, const vector< vector< int > >& profile_path, const constrVar& one, const constrVar& eps, const unsigned int& alternative_paths, const bool learning) {
 	int pr = profileOrder[number];
 	if (pr == mult_paths) {
 		// If we reach this point, we have a new PoS:)
@@ -140,7 +140,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 		int optimstatus = model.get(GRB_IntAttr_Status);
 		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
 			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
-				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
+				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning);
 			}				
 		}
 		// delete added constr:
@@ -152,30 +152,32 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 	// i: profile > nash
 	// ii: player x wants to deviate from i to j
 
-	// CASE I
-	// profile > nash
-	memset(coef, 0, sizeof(coef));
-	coef[edge(0,3)] = coef[edge(1,4)] = coef[edge(2,5)] = 1; // start with nash
-	for (i=0;i<size;i++){
-		for (j=i+1;j<size;j++){
-			if (used_profile[pr][i][j]>0) coef[edge(i,j)]-=1;
+	if( !learning ) {
+		// CASE I
+		// profile > nash
+		memset(coef, 0, sizeof(coef));
+		coef[edge(0,3)] = coef[edge(1,4)] = coef[edge(2,5)] = 1; // start with nash
+		for (i=0;i<size;i++){
+			for (j=i+1;j<size;j++){
+				if (used_profile[pr][i][j]>0) coef[edge(i,j)]-=1;
+			}
 		}
-	}
-	for (k=0;k<n_variables;k++){
-		if(coef[k]!=0) path = path + coef[k]*v_edges[k];
-	}
-	// Constraint tells: |N|<|S_i|
-	GRBConstr constr = model.addConstr(path <= 0);
-	model.optimize();
+		for (k=0;k<n_variables;k++){
+			if(coef[k]!=0) path = path + coef[k]*v_edges[k];
+		}
+		// Constraint tells: |N|<|S_i|
+		GRBConstr constr = model.addConstr(path <= 0);
+		model.optimize();
 
-	int optimstatus = model.get(GRB_IntAttr_Status);
-	if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
-		if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
-			rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
-		}				
+		int optimstatus = model.get(GRB_IntAttr_Status);
+		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
+			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
+				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning);
+			}				
+		}
+		// delete added constr:
+		model.remove(constr);
 	}
-	// delete added constr:
-	model.remove(constr);
 
 	// CASE II
 	// player x wants to deviate from i to j
@@ -190,77 +192,136 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 			tmp2.push_back(which_strategy[i+1]);
 		}
 	}
-	srand (time(NULL));
-	//int tt = rand()%count;// i: seed one each time
-	int n_seed = 3; // ii: seed n each time
-	std::vector<int> myvector;
-	for (int numb = 0; numb < count; numb++) myvector.push_back(numb);
-	int a[n_seed];
-	int counter = count;
-	for(int w = 0; w < n_seed; w++){
-		int del = rand()%counter;
-		a[w] = myvector[del];
-		myvector.erase(myvector.begin()+del);
-		counter--;
-	}
-	for (int n=0;n<n_seed;n++){
-		int tt = a[n];
-	//for (int tt=0;tt<tmp.size();tt++){ // iii: seed all
-		i = tmp[tt]; // guy
-		j = tmp2[tt]; // strategy
-		//cout<<pr<<"  "<<i<<"  "<<j<<"\n"; 
-		for (int ii=0;ii<size;ii++)
-			for (int jj=0;jj<size;jj++)
-				used[ii][jj] = used_profile[pr][ii][jj];
-		int t = profile_path[i][pr]; // path of player i belonging to this profile (so the old one which we want to change)
-		memset(coef, 0, sizeof(coef));
-		//now subtract from used pp[i][pr] strategy and insert j-th strategy instead
-/*		cout<<"start: "<<endl;
-		for (int i = 0; i < paths[3].size(); i++) {
-			vector<int>tmp = paths[3][i];
-			for(int j = 0; j < tmp.size(); j++) {
-				std::cout << tmp[j];
-			}
-			printf("\n");
-	    }
-		cout<<"guy "<<i<<"; path "<<t<<"; "<<endl;*/
-		for (k=0;k<paths[i][t].size()-1;k++){
-			coef[edge(paths[i][t][k],paths[i][t][k+1])] = -one/used[paths[i][t][k]][paths[i][t][k+1]];
-			used[paths[i][t][k]][paths[i][t][k+1]]--;
-			used[paths[i][t][k+1]][paths[i][t][k]]--;
-		}
-		//and now insert the new 
-		for (k=0;k<paths[i][j].size()-1;k++){
-			used[paths[i][j][k]][paths[i][j][k+1]]++;
-			used[paths[i][j][k+1]][paths[i][j][k]]++;
-			coef[edge(paths[i][j][k],paths[i][j][k+1])] += one/used[paths[i][j][k]][paths[i][j][k+1]];					
-		}
-		GRBLinExpr path2;
-		for (k=0;k<n_variables;k++){
-			if(coef[k]!=0) path2 = path2 + v_edges[k]*coef[k];
-		}
-		//cout<<"\n";
-		GRBConstr constr2 = model.addConstr(path2 <= 0-eps);
-		//cout<<pr<<"   "<<constraint<<" \n\n";
-		model.optimize();
-/*		if(model.get(GRB_DoubleAttr_ObjVal)>1.63) {
-			for (int i = 0; i < 8; i++) {
-				cout << v_edges[i].get(GRB_StringAttr_VarName) << " " << v_edges[i].get(GRB_DoubleAttr_X) << endl;
-			}
-			cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
-		}
-		cout<<pr<<"  :)  "<<model.get(GRB_DoubleAttr_ObjVal)<<"\n";*/
 
-		int optimstatus2 = model.get(GRB_IntAttr_Status);
-		if (optimstatus2 != GRB_INF_OR_UNBD && optimstatus2 != GRB_INFEASIBLE) {
-			//cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << " " << maximum << endl;
-			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
-				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
-			}	
+	if( alternative_paths == 0 ) {
+		for (int tt=0;tt<tmp.size();tt++){
+			i = tmp[tt]; // guy
+			j = tmp2[tt]; // strategy
+			//cout<<pr<<"  "<<i<<"  "<<j<<"\n"; 
+			for (int ii=0;ii<size;ii++)
+				for (int jj=0;jj<size;jj++)
+					used[ii][jj] = used_profile[pr][ii][jj];
+			int t = profile_path[i][pr]; // path of player i belonging to this profile (so the old one which we want to change)
+			memset(coef, 0, sizeof(coef));
+			//now subtract from used pp[i][pr] strategy and insert j-th strategy instead
+	/*		cout<<"start: "<<endl;
+			for (int i = 0; i < paths[3].size(); i++) {
+				vector<int>tmp = paths[3][i];
+				for(int j = 0; j < tmp.size(); j++) {
+					std::cout << tmp[j];
+				}
+				printf("\n");
+		    }
+			cout<<"guy "<<i<<"; path "<<t<<"; "<<endl;*/
+			for (k=0;k<paths[i][t].size()-1;k++){
+				coef[edge(paths[i][t][k],paths[i][t][k+1])] = -one/used[paths[i][t][k]][paths[i][t][k+1]];
+				used[paths[i][t][k]][paths[i][t][k+1]]--;
+				used[paths[i][t][k+1]][paths[i][t][k]]--;
+			}
+			//and now insert the new 
+			for (k=0;k<paths[i][j].size()-1;k++){
+				used[paths[i][j][k]][paths[i][j][k+1]]++;
+				used[paths[i][j][k+1]][paths[i][j][k]]++;
+				coef[edge(paths[i][j][k],paths[i][j][k+1])] += one/used[paths[i][j][k]][paths[i][j][k+1]];					
+			}
+			GRBLinExpr path2;
+			for (k=0;k<n_variables;k++){
+				if(coef[k]!=0) path2 = path2 + v_edges[k]*coef[k];
+			}
+			//cout<<"\n";
+			GRBConstr constr2 = model.addConstr(path2 <= 0-eps);
+			//cout<<pr<<"   "<<constraint<<" \n\n";
+			model.optimize();
+	/*		if(model.get(GRB_DoubleAttr_ObjVal)>1.63) {
+				for (int i = 0; i < 8; i++) {
+					cout << v_edges[i].get(GRB_StringAttr_VarName) << " " << v_edges[i].get(GRB_DoubleAttr_X) << endl;
+				}
+				cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
+			}
+			cout<<pr<<"  :)  "<<model.get(GRB_DoubleAttr_ObjVal)<<"\n";*/
+
+			int optimstatus2 = model.get(GRB_IntAttr_Status);
+			if (optimstatus2 != GRB_INF_OR_UNBD && optimstatus2 != GRB_INFEASIBLE) {
+				//cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << " " << maximum << endl;
+				if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
+					rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning);
+				}	
+			}
+			// delete added constr:
+			model.remove(constr2);
 		}
-		// delete added constr:
-		model.remove(constr2);
-	} // for ii and iii
+	} else {
+		srand (time(NULL));
+		std::vector<int> myvector;
+		for (int numb = 0; numb < count; numb++) myvector.push_back(numb);
+		int a[alternative_paths];
+		int counter = count;
+		for(int w = 0; w < alternative_paths; w++){
+			int del = rand()%counter;
+			a[w] = myvector[del];
+			myvector.erase(myvector.begin()+del);
+			counter--;
+		}
+
+		for (int n=0;n<alternative_paths;n++){
+			int tt = a[n];
+		//for (int tt=0;tt<tmp.size();tt++){ // iii: seed all
+			i = tmp[tt]; // guy
+			j = tmp2[tt]; // strategy
+			//cout<<pr<<"  "<<i<<"  "<<j<<"\n"; 
+			for (int ii=0;ii<size;ii++)
+				for (int jj=0;jj<size;jj++)
+					used[ii][jj] = used_profile[pr][ii][jj];
+			int t = profile_path[i][pr]; // path of player i belonging to this profile (so the old one which we want to change)
+			memset(coef, 0, sizeof(coef));
+			//now subtract from used pp[i][pr] strategy and insert j-th strategy instead
+	/*		cout<<"start: "<<endl;
+			for (int i = 0; i < paths[3].size(); i++) {
+				vector<int>tmp = paths[3][i];
+				for(int j = 0; j < tmp.size(); j++) {
+					std::cout << tmp[j];
+				}
+				printf("\n");
+		    }
+			cout<<"guy "<<i<<"; path "<<t<<"; "<<endl;*/
+			for (k=0;k<paths[i][t].size()-1;k++){
+				coef[edge(paths[i][t][k],paths[i][t][k+1])] = -one/used[paths[i][t][k]][paths[i][t][k+1]];
+				used[paths[i][t][k]][paths[i][t][k+1]]--;
+				used[paths[i][t][k+1]][paths[i][t][k]]--;
+			}
+			//and now insert the new 
+			for (k=0;k<paths[i][j].size()-1;k++){
+				used[paths[i][j][k]][paths[i][j][k+1]]++;
+				used[paths[i][j][k+1]][paths[i][j][k]]++;
+				coef[edge(paths[i][j][k],paths[i][j][k+1])] += one/used[paths[i][j][k]][paths[i][j][k+1]];					
+			}
+			GRBLinExpr path2;
+			for (k=0;k<n_variables;k++){
+				if(coef[k]!=0) path2 = path2 + v_edges[k]*coef[k];
+			}
+			//cout<<"\n";
+			GRBConstr constr2 = model.addConstr(path2 <= 0-eps);
+			//cout<<pr<<"   "<<constraint<<" \n\n";
+			model.optimize();
+	/*		if(model.get(GRB_DoubleAttr_ObjVal)>1.63) {
+				for (int i = 0; i < 8; i++) {
+					cout << v_edges[i].get(GRB_StringAttr_VarName) << " " << v_edges[i].get(GRB_DoubleAttr_X) << endl;
+				}
+				cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
+			}
+			cout<<pr<<"  :)  "<<model.get(GRB_DoubleAttr_ObjVal)<<"\n";*/
+
+			int optimstatus2 = model.get(GRB_IntAttr_Status);
+			if (optimstatus2 != GRB_INF_OR_UNBD && optimstatus2 != GRB_INFEASIBLE) {
+				//cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << " " << maximum << endl;
+				if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
+					rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning);
+				}	
+			}
+			// delete added constr:
+			model.remove(constr2);
+		}
+	}
 }
 
 int main(int argc, char *argv[]) {
@@ -272,7 +333,8 @@ int main(int argc, char *argv[]) {
 		const unsigned int n_variables = 8; // defines the number of edges we have in our graph
 		const constrVar one = 60000;
 		const constrVar eps = 1;
-		bool learning = false;
+		const unsigned int alternative_paths = 0; // alternative paths to consider in rec: 0 -> all, 1,..,n -> random subset in each call
+		const bool learning = true;
 		const double learn_costs[n_variables] = {113,277,418,318,0,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
 		constrVar maximum = 1.3*one; // 1.57, starting point for finding PoS
 
@@ -490,7 +552,7 @@ int main(int argc, char *argv[]) {
 			}
 			if( notIn ) profileOrder.push_back(i);
 		}
-		cout << "We go trough " << profileOrder.size()-1 << " profiles" << endl;
+		cout << "We go trough " << profileOrder.size()-1 << " profiles and consider " << alternative_paths << " alternative paths in each call (0 == all)" << endl;
 /*		cout << "expensive:" << endl;
 		for(int i = 0; i < expensive.size(); i++){
 			cout<< expensive[i]<<" ";
@@ -620,7 +682,7 @@ int main(int argc, char *argv[]) {
 
 		//cout<<"heavy profile at nr 19: "<<heavy_profile[19]<<endl;
 		cout<<"Start recursion\n";
-		rec(0, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps);
+		rec(0, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning);
 		cout<<"End recursion\n";
 /*		for (int i = 0; i < n_variables; i++) {
 			cout << v_edges[i].get(GRB_StringAttr_VarName) << " "
