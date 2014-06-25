@@ -26,7 +26,7 @@ using namespace std;
 //[0,1,],[1,2,],[2,4,],[4,3,],[3,5,],[0,3,],[1,4,],[2,5,]
 //[0,1,0.],[1,2,0.],[2,4,0.],[4,3,0.],[3,5,0.],[0,3,0.],[1,4,0.],[2,5,0.]
 
-typedef int constrVar; // constraint type
+typedef long int constrVar; // constraint type
 
 /*
  * get edge-number depending on vertex-numbers
@@ -59,8 +59,40 @@ int edge(int i, int j){
 		return -1; // gives segfault bc array[-1] doesnt exist
 }
 
-void rec(int number, const vector<unsigned int>& profileOrder, const unsigned int& n_variables, const unsigned int& size, const int& mult_paths, GRBModel& model, GRBVar* v_edges, const vector< vector< vector< int > > >& used_profile, const vector<int>& which_guy, const vector<int>& which_strategy, const vector<int>& heavy_profile, constrVar& maximum, const vector< vector< vector< int > > >& paths, const vector< vector< int > >& profile_path, const constrVar& one, const constrVar& eps, const unsigned int& alternative_paths, const bool learning) {
+// globals for learning:)
+int rec_count=0;
+int opt_count=0;
+int number_of_zeros=0;
+constrVar opt_before = 0;
+int biggest_nr=0;
+
+void rec(int number, const vector<unsigned int>& profileOrder, const unsigned int& n_variables, const unsigned int& size, const int& mult_paths, GRBModel& model, GRBVar* v_edges, const vector< vector< vector< int > > >& used_profile, const vector<int>& which_guy, const vector<int>& which_strategy, vector<int>& heavy_profile, constrVar& maximum, const vector< vector< vector< int > > >& paths, const vector< vector< int > >& profile_path, const constrVar& one, const constrVar& eps, const unsigned int& alternative_paths, const bool learning, vector< vector < vector <int> > >& profile_path_memory) {
+	rec_count++;
 	int pr = profileOrder[number];
+	if(number>biggest_nr) biggest_nr=number;
+	if(!(rec_count%10000)) {
+		cout<<"heavy: ";
+		for (int pr = 0; pr < mult_paths; pr++){
+			if(heavy_profile[pr]) cout<<pr<<" ";
+		}
+		cout<<endl;
+		int temp_count = 0;
+		int temp_heavy = 0;
+		for (int pr = 0; pr < mult_paths; pr++){
+			// go trough all players
+			for (int i = 0; i < 3; i++){
+				// i-th guy wants to deviate
+				for (int j = 0; j < profile_path_memory[pr][i].size(); j++){
+					if(profile_path_memory[pr][i][j]==1) temp_count++;
+				}
+			}
+		}
+		for (int pr = 0; pr < mult_paths; pr++){
+			temp_heavy += heavy_profile[pr];
+		}
+		cout<<rec_count<<" We have "<<temp_count<<" ones in profile_path_memory and the zero count is at "<<number_of_zeros<<" opt count: "<<opt_count<<" heavy count: "<<temp_heavy<<" profile: "<<number<<" latest pr: "<<profileOrder[biggest_nr]<<endl;
+	}
+
 	if (pr == mult_paths) {
 		// If we reach this point, we have a new PoS:)
 
@@ -76,16 +108,6 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 				"],[1,3,"<<v_edges[5].get(GRB_DoubleAttr_X)<<
 				"],[2,4,"<<v_edges[6].get(GRB_DoubleAttr_X)<<
 				"]"<<endl;
-
-/*		cout << "Straight line:" << endl;
-		cout << "cost p1 on opt: " << v_edges[0].get(GRB_DoubleAttr_X)+v_edges[1].get(GRB_DoubleAttr_X)/2+v_edges[2].get(GRB_DoubleAttr_X)/3+v_edges[3].get(GRB_DoubleAttr_X)/2 << endl;
-		cout << "cost p2 on opt: " << v_edges[1].get(GRB_DoubleAttr_X)/2+v_edges[2].get(GRB_DoubleAttr_X)/3 << endl;
-		cout << "cost p3 on opt: " << v_edges[2].get(GRB_DoubleAttr_X)/3+v_edges[3].get(GRB_DoubleAttr_X)/2+v_edges[4].get(GRB_DoubleAttr_X) << endl;
-
-		cout << "Player 1 goes N (0,3) others straight line:" << endl;
-		cout << "cost p1: " << v_edges[5].get(GRB_DoubleAttr_X) << endl;
-		cout << "cost p2 straight: " << v_edges[1].get(GRB_DoubleAttr_X)+v_edges[2].get(GRB_DoubleAttr_X)/2 << endl;
-		cout << "cost p3 straight: " << v_edges[2].get(GRB_DoubleAttr_X)/2+v_edges[3].get(GRB_DoubleAttr_X)+v_edges[4].get(GRB_DoubleAttr_X) << endl;*/
 
 		maximum = model.get(GRB_DoubleAttr_ObjVal);
 		cout << "PoS: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
@@ -136,8 +158,14 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 
 		int optimstatus = model.get(GRB_IntAttr_Status);
 		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
+/*			if(opt_before == model.get(GRB_DoubleAttr_ObjVal)) {
+				profile_path_memory[pr][i][j] = 0;
+				number_of_zeros++;
+			}*/
+			opt_before = model.get(GRB_DoubleAttr_ObjVal);
+			//cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << " " << maximum << endl;
 			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
-				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning);
+				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
 			}				
 		}
 		// delete added constr:
@@ -152,6 +180,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 	if( !learning ) {
 		// CASE I
 		// profile > nash
+
 		memset(coef, 0, sizeof(coef));
 		coef[edge(0,4)] = coef[edge(1,3)] = coef[edge(2,4)] = 1; // start with nash
 		for (i=0;i<size;i++){
@@ -164,14 +193,27 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 		}
 		// Constraint tells: |N|<|S_i|
 		GRBConstr constr = model.addConstr(path <= 0);
-		model.optimize();
+		if( !profile_path_memory[profile_path_memory.size()-1][0][pr] ){
+			//cout<<"direct to rec from nash<prof! "<<number<<endl;
+			rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
+		} else {
+			model.optimize();
+			opt_count++;
 
-		int optimstatus = model.get(GRB_IntAttr_Status);
-		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
-			cout << pr << " " << maximum << endl;
-			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
-				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning);
-			}				
+			int optimstatus = model.get(GRB_IntAttr_Status);
+			if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
+				if(opt_before == model.get(GRB_DoubleAttr_ObjVal)) {
+					profile_path_memory[profile_path_memory.size()-1][0][pr] = 0;
+					number_of_zeros++;
+				}
+				//cout << pr << " " << maximum << endl;
+				if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
+					opt_before = model.get(GRB_DoubleAttr_ObjVal);
+					//heavy_profile[pr] = 1;
+					rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
+				}
+								
+			}
 		}
 		// delete added constr:
 		model.remove(constr);
@@ -195,6 +237,19 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 		for (int tt=0;tt<tmp.size();tt++){
 			i = tmp[tt]; // guy
 			j = tmp2[tt]; // strategy
+			bool temp_er=true;
+			for(int e = 0; e < profile_path_memory[pr][i].size(); e++){
+				if(profile_path_memory[pr][i][e]) temp_er=false;
+			}
+			if(temp_er) {
+				/*for(int c=0; c<profileOrder.size(); c++)
+					if(profileOrder[c] == pr) {
+						profileOrder.erase(profileOrder.begin()+c);
+					}*/
+				heavy_profile[pr] = 1;
+				cout << "bla" << endl;
+				return;
+			}
 			//cout<<pr<<"  "<<i<<"  "<<j<<"\n"; 
 			for (int ii=0;ii<size;ii++)
 				for (int jj=0;jj<size;jj++)
@@ -229,21 +284,32 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 			//cout<<"\n";
 			GRBConstr constr2 = model.addConstr(path2 <= 0-eps);
 			//cout<<pr<<"   "<<constraint<<" \n\n";
-			model.optimize();
-	/*		if(model.get(GRB_DoubleAttr_ObjVal)>1.63) {
-				for (int i = 0; i < 8; i++) {
-					cout << v_edges[i].get(GRB_StringAttr_VarName) << " " << v_edges[i].get(GRB_DoubleAttr_X) << endl;
+			if( !profile_path_memory[pr][i][j] ) {
+				//cout<<"direct to rec from deviate! "<<number<<" opt_bef:"<<opt_before<<" max:"<<maximum<<endl;
+				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
+			} else {
+				model.optimize();
+				opt_count++;
+		/*		if(model.get(GRB_DoubleAttr_ObjVal)>1.63) {
+					for (int i = 0; i < 8; i++) {
+						cout << v_edges[i].get(GRB_StringAttr_VarName) << " " << v_edges[i].get(GRB_DoubleAttr_X) << endl;
+					}
+					cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
 				}
-				cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
-			}
-			cout<<pr<<"  :)  "<<model.get(GRB_DoubleAttr_ObjVal)<<"\n";*/
+				cout<<pr<<"  :)  "<<model.get(GRB_DoubleAttr_ObjVal)<<"\n";*/
 
-			int optimstatus2 = model.get(GRB_IntAttr_Status);
-			if (optimstatus2 != GRB_INF_OR_UNBD && optimstatus2 != GRB_INFEASIBLE) {
-				//cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << " " << maximum << endl;
-				if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
-					rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning);
-				}	
+				int optimstatus2 = model.get(GRB_IntAttr_Status);
+				if (optimstatus2 != GRB_INF_OR_UNBD && optimstatus2 != GRB_INFEASIBLE) {
+					//cout << pr << " obj: " << model.get(GRB_DoubleAttr_ObjVal)<< " bef: " << opt_before << " #0: " <<number_of_zeros << " max: " << maximum << endl;
+					if(opt_before == model.get(GRB_DoubleAttr_ObjVal)) {
+						profile_path_memory[pr][i][j] = 0;
+						number_of_zeros++;
+					}
+					if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
+						opt_before = model.get(GRB_DoubleAttr_ObjVal);
+						rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
+					}	
+				}
 			}
 			// delete added constr:
 			model.remove(constr2);
@@ -266,6 +332,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 		//for (int tt=0;tt<tmp.size();tt++){ // iii: seed all
 			i = tmp[tt]; // guy
 			j = tmp2[tt]; // strategy
+			if(!profile_path_memory[pr][i][j]) return;
 			//cout<<pr<<"  "<<i<<"  "<<j<<"\n"; 
 			for (int ii=0;ii<size;ii++)
 				for (int jj=0;jj<size;jj++)
@@ -311,9 +378,14 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 
 			int optimstatus2 = model.get(GRB_IntAttr_Status);
 			if (optimstatus2 != GRB_INF_OR_UNBD && optimstatus2 != GRB_INFEASIBLE) {
+				if(opt_before == model.get(GRB_DoubleAttr_ObjVal)) {
+					profile_path_memory[pr][i][j] = 0;
+					number_of_zeros++;
+				}
+				opt_before = model.get(GRB_DoubleAttr_ObjVal);
 				//cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << " " << maximum << endl;
 				if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
-					rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning);
+					rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
 				}	
 			}
 			// delete added constr:
@@ -334,13 +406,13 @@ int main(int argc, char *argv[]) {
 		const unsigned int alternative_paths = 0; // alternative paths to consider in rec: 0 -> all, 1,..,n -> random subset in each call
 		const bool learning = true;
 		const double learn_costs[n_variables] = {113,277,418,318,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
-		constrVar maximum = 1.5*one; // 1.57, starting point for finding PoS
+		constrVar maximum = 1.57*one; // 1.57, starting point for finding PoS
 
 		/////////////////////
 		// Order of profiles:
 		/////////////////////
-		unsigned int numberOfChanges = 7; // number of profiles accounted for in next line
-		unsigned int first[] = {40,68,14,18,17,16,15,13}; // write here the profiles which have to be consiered first!
+		unsigned int numberOfChanges = 13; // number of profiles accounted for in next line
+		unsigned int first[] = {40,104,19,14,11,4,1,103,15,10,16,45,69}; // write here the profiles which have to be consiered first!
 		//unsigned int ignor[] = {4,6,9,12,13,15,17,18,20,21,24,25,26,27,30,31,34,35,37,38,40,42,45,46,48,49,53,54,65,68,69,70,73,74,78,79,80,81,84,85,86,89,91,93,94,96,98,99,101,102,111,112,113,114,115,116,117,120,123,124};
 
 		///////////////////////////////////////////////////////////
@@ -557,7 +629,7 @@ int main(int argc, char *argv[]) {
 		}
 		cout << "We go trough " << profileOrder.size()-1 << " profiles and consider " << alternative_paths << " alternative paths in each call (0 == all)" << endl;
 		cout << "Learning is " << learning << endl;
-/*		cout << "expensive:" << endl;
+		cout << "expensive:" << endl;
 		for(int i = 0; i < expensive.size(); i++){
 			cout<< expensive[i]<<" ";
 		}
@@ -566,7 +638,7 @@ int main(int argc, char *argv[]) {
 		for(int i = 0; i < profileOrder.size(); i++){
 			cout<< profileOrder[i]<<" ";
 		}
-		cout << endl;*/
+		cout << endl;
 
 		// 6:
 		// Till now we have that |N| is Nash and direct line is min. But |N| is not yet min |N|
@@ -586,6 +658,32 @@ int main(int argc, char *argv[]) {
 		     << v_edges[i].get(GRB_DoubleAttr_X) << endl;
 		}
 		cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;*/
+
+		// 6.0
+		// Prepare vector to remember if a certain change of path in a profile is worth trying again
+		vector< vector < vector <int> > > profile_path_memory;
+		vector<int> temp1;
+		vector< vector<int> > temp2;
+		for (int pr = 0; pr < mult_paths; pr++){
+			temp2.clear();
+			// go trough all players
+			for (int i = 0; i < 3; i++){
+				temp1.clear();
+				// i-th guy wants to deviate
+				for (int j = 0; j < paths_pp[i]; j++){
+					temp1.push_back(1);
+				}
+				temp2.push_back(temp1);
+			}
+			profile_path_memory.push_back(temp2);
+		}
+		temp1.clear();
+		temp2.clear();
+		for (int pr = 0; pr < mult_paths; pr++){
+			temp1.push_back(1);
+		}
+		temp2.push_back(temp1);
+		profile_path_memory.push_back(temp2);
 
 		// 6.1:
 		// learning from paper example:
@@ -641,7 +739,7 @@ int main(int argc, char *argv[]) {
 								which_guy.push_back(i);
 								which_strategy.push_back(pr);
 								which_strategy.push_back(j);
-							}					
+							}				
 						}
 					} else {
 						if (j != profile_path[i][pr]){
@@ -686,8 +784,8 @@ int main(int argc, char *argv[]) {
 
 		//cout<<"heavy profile at nr 19: "<<heavy_profile[19]<<endl;
 		cout<<"Start recursion\n";
-		rec(0, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning);
-		cout<<"End recursion\n";
+		rec(0, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
+		cout<<"End recursion, rec="<<rec_count<<"\n";
 /*		for (int i = 0; i < n_variables; i++) {
 			cout << v_edges[i].get(GRB_StringAttr_VarName) << " "
 		     << v_edges[i].get(GRB_DoubleAttr_X) << endl;
