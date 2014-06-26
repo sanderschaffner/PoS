@@ -54,6 +54,8 @@ int edge(int i, int j){
 		return 5;
 	else if (i==2 && j==4)
 		return 6;
+	else if (i==0 && j==2)
+		return 7;
 	else
 		cout << "Edge not defined! i = " << i << ", j = " << j << endl;
 		return -1; // gives segfault bc array[-1] doesnt exist
@@ -62,17 +64,20 @@ int edge(int i, int j){
 // globals for learning:)
 int rec_count=0;
 int biggest_nr=0;
+int counter_paths=0;
+int counter_with7=0;
+int counter_negDiff=0;
 
 void rec(int number, const vector<unsigned int>& profileOrder, const unsigned int& n_variables, const unsigned int& size, const int& mult_paths, GRBModel& model, GRBVar* v_edges, const vector< vector< vector< int > > >& used_profile, const vector<int>& which_guy, const vector<int>& which_strategy, vector<int>& heavy_profile, constrVar& maximum, const vector< vector< vector< int > > >& paths, const vector< vector< int > >& profile_path, const constrVar& one, const constrVar& eps, const unsigned int& alternative_paths, const bool learning, vector< vector < vector <int> > >& profile_path_memory) {
 	rec_count++;
 	int pr = profileOrder[number];
 	if(number>biggest_nr) biggest_nr=number;
-	if(!(rec_count%100000)) {
-		cout<<"heavy: ";
+	if(!(rec_count%1000)) {
+/*		cout<<"heavy: ";
 		for (int pr = 0; pr < mult_paths; pr++){
 			if(heavy_profile[pr]) cout<<pr<<" ";
 		}
-		cout<<endl;
+		cout<<endl;*/
 		int temp_heavy = 0;
 		for (int pr = 0; pr < mult_paths; pr++){
 			temp_heavy += heavy_profile[pr];
@@ -358,20 +363,20 @@ int main(int argc, char *argv[]) {
 		// Variables to set:
 		////////////////////
 		const unsigned int size = 5; // defines how many nodes we have in our graph (also edit this in paths.h)
-		const unsigned int n_variables = 7; // defines the number of edges we have in our graph
+		const unsigned int n_variables = 8; // defines the number of edges we have in our graph
 		const constrVar one = 60000;
-		const constrVar eps = 0;
+		const constrVar eps = 1;
 		const unsigned int alternative_paths = 0; // alternative paths to consider in rec: 0 -> all, 1,..,n -> random subset in each call
 		const bool learning = true;
 		const double learn_costs[n_variables] = {113,277,418,318,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
-		constrVar maximum = 1.57*one; // 1.57, starting point for finding PoS
+		constrVar maximum = 1.5*one; // 1.57, starting point for finding PoS
 
 		/////////////////////
 		// Order of profiles:
 		/////////////////////
-		unsigned int numberOfChanges = 13; // number of profiles accounted for in next line
-		unsigned int first[] = {40,104,19,14,11,4,1,103,15,10,16,45,69}; // write here the profiles which have to be consiered first!
-		//unsigned int ignor[] = {4,6,9,12,13,15,17,18,20,21,24,25,26,27,30,31,34,35,37,38,40,42,45,46,48,49,53,54,65,68,69,70,73,74,78,79,80,81,84,85,86,89,91,93,94,96,98,99,101,102,111,112,113,114,115,116,117,120,123,124};
+		unsigned int numberOfChanges = 3; // number of profiles accounted for in next line
+		unsigned int first[] = {20,19,21}; // write here the profiles which have to be consiered first!
+		//unsigned int ignor[] = {40,104,19,14,11,4,1,103,15,10,16,45,69};
 
 		///////////////////////////////////////////////////////////
 		// Create Graph and find all possible paths for each player
@@ -393,6 +398,7 @@ int main(int argc, char *argv[]) {
 		graph[1][0] = 1; graph[2][1] = 1; graph[3][2] = 1; graph[4][3] = 1;
 		graph[0][4] = 1; graph[1][3] = 1; graph[2][4] = 1;
 		graph[4][0] = 1; graph[3][1] = 1; graph[4][2] = 1;
+		graph[0][2] = 1; graph[2][0] = 1;
 
 		// 2:
 		// Get all possible paths for each player in the graph
@@ -437,6 +443,9 @@ int main(int argc, char *argv[]) {
 		model.addConstr(v_edges[edge(2,3)] <= v_edges[edge(1,3)]);
 		model.addConstr(v_edges[edge(2,3)] <= v_edges[edge(2,4)]);
 		model.addConstr(v_edges[edge(3,4)] <= v_edges[edge(2,4)]);
+
+		model.addConstr(v_edges[edge(0,2)] <= v_edges[edge(0,4)]);
+		model.addConstr(v_edges[edge(0,2)] <= v_edges[edge(1,3)]);
 		// Cost of the spanning tree is 1 (optimum has cost one -> result of lp gives directly PoS)
 /*		GRBLinExpr cost_p1_opt = v_edges[edge(0,1)] + v_edges[edge(1,2)]/2 + v_edges[edge(2,4)]/3;
 		GRBLinExpr cost_p2_opt = v_edges[edge(1,2)]/2 + v_edges[edge(2,4)]/3 + v_edges[edge(3,4)]/2;
@@ -653,6 +662,7 @@ int main(int argc, char *argv[]) {
 		vector<int> which_guy; // first profile, than guy
 		vector<int> which_strategy; // first profile, than strategy
 		vector<int> heavy_profile(mult_paths,0);
+		bool path7 = false;
 		// go trough all profiles
 		for (pr = 1; pr < mult_paths; pr++){
 			// go trough all players
@@ -661,43 +671,64 @@ int main(int argc, char *argv[]) {
 				for (int j = 0; j < paths_pp[i]; j++){
 					if(learning) {
 						// to the j-th strategy
-						// therefore the path used in this profile (== profile_path[i][pr]) should not be j itself (else we have no change!)
-						if (j != profile_path[i][pr]){
-							// go trough whole used[][] and make a copy of the previous used_profile we already have computed
-							for (int ii = 0; ii < size; ii++)
-								for (int jj = 0; jj < size; jj++)
-									used[ii][jj] = used_profile[pr][ii][jj];
-							int t = profile_path[i][pr]; // path of i-th player in strategy pr which was considered and shall be changed!
-							diff = 0;
-							// now subtract from used t = profile_path[i][pr] (old) strategy and insert j-th (new) strategy instead
-							for (k = 0; k < paths[i][t].size() - 1; k++){
-								// subtract from diff all edge-costs of path t and weight it apropriate
-								diff -= learn_costs[edge(paths[i][t][k],paths[i][t][k+1])] / used[paths[i][t][k]][paths[i][t][k+1]];
-								// get ridd of path t in used
-								used[paths[i][t][k]][paths[i][t][k+1]]--;
-								used[paths[i][t][k+1]][paths[i][t][k]]--;
-							}
-							//if (pr==31){
-							//	cout << "Diff of profile = " << pr << " before adding: " << diff << endl;
-							//}
-							// and now insert the new 
-							for (k = 0; k < paths[i][j].size() - 1; k++){
-								// FIRST update used
-								used[paths[i][j][k]][paths[i][j][k+1]]++;
-								used[paths[i][j][k+1]][paths[i][j][k]]++;
-								// and then add costs
-								diff += learn_costs[edge(paths[i][j][k],paths[i][j][k+1])] / used[paths[i][j][k]][paths[i][j][k+1]];					
-							}
 
-							// if difference is negative we save person and profile number! 
-							//if (diff < 0){
-								if (pr > 0)
-									//cout << "Profile = " << pr << ".  " << i << " guy wants to change to " << j << "-th strategy  " << "and diff is " << diff << endl;
+						// includes j-th strategy edge7?
+						path7=false;
+						for (k = 0; k < paths[i][j].size() - 1; k++){
+							if(edge(paths[i][j][k],paths[i][j][k+1])==7) path7=true;				
+						}
+
+						// count all alt paths
+						if (j != profile_path[i][pr]){
+							counter_paths++;
+						}
+
+						if(!path7) {
+							// therefore the path used in this profile (== profile_path[i][pr]) should not be j itself (else we have no change!)
+							if (j != profile_path[i][pr]){
+								// go trough whole used[][] and make a copy of the previous used_profile we already have computed
+								for (int ii = 0; ii < size; ii++)
+									for (int jj = 0; jj < size; jj++)
+										used[ii][jj] = used_profile[pr][ii][jj];
+								int t = profile_path[i][pr]; // path of i-th player in strategy pr which was considered and shall be changed!
+								diff = 0;
+								// now subtract from used t = profile_path[i][pr] (old) strategy and insert j-th (new) strategy instead
+								for (k = 0; k < paths[i][t].size() - 1; k++){
+									// subtract from diff all edge-costs of path t and weight it apropriate
+									diff -= learn_costs[edge(paths[i][t][k],paths[i][t][k+1])] / used[paths[i][t][k]][paths[i][t][k+1]];
+									// get ridd of path t in used
+									used[paths[i][t][k]][paths[i][t][k+1]]--;
+									used[paths[i][t][k+1]][paths[i][t][k]]--;
+								}
+								//if (pr==31){
+								//	cout << "Diff of profile = " << pr << " before adding: " << diff << endl;
+								//}
+								// and now insert the new 
+								for (k = 0; k < paths[i][j].size() - 1; k++){
+									// FIRST update used
+									used[paths[i][j][k]][paths[i][j][k+1]]++;
+									used[paths[i][j][k+1]][paths[i][j][k]]++;
+									// and then add costs
+									diff += learn_costs[edge(paths[i][j][k],paths[i][j][k+1])] / used[paths[i][j][k]][paths[i][j][k+1]];					
+								}
+
+								// if difference is negative we save person and profile number! 
+								if (diff < 0){
+									counter_negDiff++;
+									which_guy.push_back(pr);
+									which_guy.push_back(i);
+									which_strategy.push_back(pr);
+									which_strategy.push_back(j);
+								}				
+							}
+						} else {
+							if (j != profile_path[i][pr]){
+								counter_with7++;
 								which_guy.push_back(pr);
 								which_guy.push_back(i);
 								which_strategy.push_back(pr);
 								which_strategy.push_back(j);
-							//}				
+							}
 						}
 					} else {
 						if (j != profile_path[i][pr]){
@@ -712,15 +743,17 @@ int main(int argc, char *argv[]) {
 
 			if(learning) {
 				diff = paper_nash;
+				bool temp_learn = true;
 				// go trough used_profile which has not changed!
 				for (int i = 0; i < size; i++)
 					for (int j = i + 1; j < size; j++){
 						// subtract all costs of the proposed profile from Nash
 						if (used_profile[pr][i][j] > 0) {
-							diff -= learn_costs[edge(i,j)];
+							if(edge(i,j)!=7) diff -= learn_costs[edge(i,j)];
+							else temp_learn = false;
 						}
 					}
-				if ( diff < 0) 
+				if ( diff < 0 && temp_learn ) 
 				{
 					// Nash is smaller than proposed edges of profile
 					//cout << pr <<"-th strategy profile is sligtly heavier than Nash and the difference is "<< diff << endl;
@@ -729,6 +762,8 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		cout << "We found " << which_guy.size()/2 << " changes we want to have a closer look on" <<endl;
+		cout << "We have " << heavy_profile.size() << " heavy profiles" << endl;
+		cout << "There are " << counter_paths << " alternative paths. " << counter_with7 << " include edge 7 and " << counter_negDiff << " have negative diff" << endl;
 /*		for(int i = 0; i<which_strategy.size(); i+=2){
 			cout << which_strategy[i] << " " << which_strategy[i+1] << endl;
 		}*/
