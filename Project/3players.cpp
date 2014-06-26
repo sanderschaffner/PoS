@@ -67,7 +67,7 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 	rec_count++;
 	int pr = profileOrder[number];
 	if(number>biggest_nr) biggest_nr=number;
-	if(!(rec_count%10000)) {
+	if(!(rec_count%100000)) {
 		cout<<"heavy: ";
 		for (int pr = 0; pr < mult_paths; pr++){
 			if(heavy_profile[pr]) cout<<pr<<" ";
@@ -360,7 +360,7 @@ int main(int argc, char *argv[]) {
 		const unsigned int size = 5; // defines how many nodes we have in our graph (also edit this in paths.h)
 		const unsigned int n_variables = 7; // defines the number of edges we have in our graph
 		const constrVar one = 60000;
-		const constrVar eps = 1;
+		const constrVar eps = 0;
 		const unsigned int alternative_paths = 0; // alternative paths to consider in rec: 0 -> all, 1,..,n -> random subset in each call
 		const bool learning = true;
 		const double learn_costs[n_variables] = {113,277,418,318,549,556,664}; // These are the edge-costs from the paper -> PoS = 1.571
@@ -473,7 +473,7 @@ int main(int argc, char *argv[]) {
 					cout << "  +  " << one/(used[paths[i][j][k]][paths[i][j][k+1]]+1) << " * " << edge(paths[i][j][k],paths[i][j][k+1]);
 				}
 				// add constraint: nesh_path < all possible alternatives
-				model.addConstr(v_edges[edge(i,x)] <= temp_expr);
+				model.addConstr(one*v_edges[edge(i,x)] <= temp_expr-eps);
 				cout<<"\n";
 				
 			}
@@ -690,14 +690,14 @@ int main(int argc, char *argv[]) {
 							}
 
 							// if difference is negative we save person and profile number! 
-							if (diff < 0){
+							//if (diff < 0){
 								if (pr > 0)
 									//cout << "Profile = " << pr << ".  " << i << " guy wants to change to " << j << "-th strategy  " << "and diff is " << diff << endl;
 								which_guy.push_back(pr);
 								which_guy.push_back(i);
 								which_strategy.push_back(pr);
 								which_strategy.push_back(j);
-							}				
+							//}				
 						}
 					} else {
 						if (j != profile_path[i][pr]){
