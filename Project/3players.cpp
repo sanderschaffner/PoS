@@ -61,9 +61,6 @@ int edge(int i, int j){
 
 // globals for learning:)
 int rec_count=0;
-int opt_count=0;
-int number_of_zeros=0;
-constrVar opt_before = 0;
 int biggest_nr=0;
 
 void rec(int number, const vector<unsigned int>& profileOrder, const unsigned int& n_variables, const unsigned int& size, const int& mult_paths, GRBModel& model, GRBVar* v_edges, const vector< vector< vector< int > > >& used_profile, const vector<int>& which_guy, const vector<int>& which_strategy, vector<int>& heavy_profile, constrVar& maximum, const vector< vector< vector< int > > >& paths, const vector< vector< int > >& profile_path, const constrVar& one, const constrVar& eps, const unsigned int& alternative_paths, const bool learning, vector< vector < vector <int> > >& profile_path_memory) {
@@ -76,21 +73,11 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 			if(heavy_profile[pr]) cout<<pr<<" ";
 		}
 		cout<<endl;
-		int temp_count = 0;
 		int temp_heavy = 0;
-		for (int pr = 0; pr < mult_paths; pr++){
-			// go trough all players
-			for (int i = 0; i < 3; i++){
-				// i-th guy wants to deviate
-				for (int j = 0; j < profile_path_memory[pr][i].size(); j++){
-					if(profile_path_memory[pr][i][j]==1) temp_count++;
-				}
-			}
-		}
 		for (int pr = 0; pr < mult_paths; pr++){
 			temp_heavy += heavy_profile[pr];
 		}
-		cout<<rec_count<<" We have "<<temp_count<<" ones in profile_path_memory and the zero count is at "<<number_of_zeros<<" opt count: "<<opt_count<<" heavy count: "<<temp_heavy<<" profile: "<<number<<" latest pr: "<<profileOrder[biggest_nr]<<endl;
+		cout<<rec_count<<" profile: "<<number<<" latest pr: "<<profileOrder[biggest_nr]<<endl;
 	}
 
 	if (pr == mult_paths) {
@@ -158,11 +145,6 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 
 		int optimstatus = model.get(GRB_IntAttr_Status);
 		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
-/*			if(opt_before == model.get(GRB_DoubleAttr_ObjVal)) {
-				profile_path_memory[pr][i][j] = 0;
-				number_of_zeros++;
-			}*/
-			opt_before = model.get(GRB_DoubleAttr_ObjVal);
 			//cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << " " << maximum << endl;
 			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
 				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
@@ -193,27 +175,17 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 		}
 		// Constraint tells: |N|<|S_i|
 		GRBConstr constr = model.addConstr(path <= 0);
-		if( !profile_path_memory[profile_path_memory.size()-1][0][pr] ){
-			//cout<<"direct to rec from nash<prof! "<<number<<endl;
-			rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
-		} else {
-			model.optimize();
-			opt_count++;
 
-			int optimstatus = model.get(GRB_IntAttr_Status);
-			if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
-				if(opt_before == model.get(GRB_DoubleAttr_ObjVal)) {
-					profile_path_memory[profile_path_memory.size()-1][0][pr] = 0;
-					number_of_zeros++;
-				}
-				//cout << pr << " " << maximum << endl;
-				if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
-					opt_before = model.get(GRB_DoubleAttr_ObjVal);
-					//heavy_profile[pr] = 1;
-					rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
-				}
-								
+		model.optimize();
+
+		int optimstatus = model.get(GRB_IntAttr_Status);
+		if (optimstatus != GRB_INF_OR_UNBD && optimstatus != GRB_INFEASIBLE) {
+			//cout << pr << " " << maximum << endl;
+			if (model.get(GRB_DoubleAttr_ObjVal)>maximum) {
+				//heavy_profile[pr] = 1;
+				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
 			}
+							
 		}
 		// delete added constr:
 		model.remove(constr);
@@ -284,33 +256,24 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 			//cout<<"\n";
 			GRBConstr constr2 = model.addConstr(path2 <= 0-eps);
 			//cout<<pr<<"   "<<constraint<<" \n\n";
-			if( !profile_path_memory[pr][i][j] ) {
-				//cout<<"direct to rec from deviate! "<<number<<" opt_bef:"<<opt_before<<" max:"<<maximum<<endl;
-				rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
-			} else {
-				model.optimize();
-				opt_count++;
-		/*		if(model.get(GRB_DoubleAttr_ObjVal)>1.63) {
-					for (int i = 0; i < 8; i++) {
-						cout << v_edges[i].get(GRB_StringAttr_VarName) << " " << v_edges[i].get(GRB_DoubleAttr_X) << endl;
-					}
-					cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
-				}
-				cout<<pr<<"  :)  "<<model.get(GRB_DoubleAttr_ObjVal)<<"\n";*/
 
-				int optimstatus2 = model.get(GRB_IntAttr_Status);
-				if (optimstatus2 != GRB_INF_OR_UNBD && optimstatus2 != GRB_INFEASIBLE) {
-					//cout << pr << " obj: " << model.get(GRB_DoubleAttr_ObjVal)<< " bef: " << opt_before << " #0: " <<number_of_zeros << " max: " << maximum << endl;
-					if(opt_before == model.get(GRB_DoubleAttr_ObjVal)) {
-						profile_path_memory[pr][i][j] = 0;
-						number_of_zeros++;
-					}
-					if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
-						opt_before = model.get(GRB_DoubleAttr_ObjVal);
-						rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
-					}	
+			model.optimize();
+	/*		if(model.get(GRB_DoubleAttr_ObjVal)>1.63) {
+				for (int i = 0; i < 8; i++) {
+					cout << v_edges[i].get(GRB_StringAttr_VarName) << " " << v_edges[i].get(GRB_DoubleAttr_X) << endl;
 				}
+				cout << "Something like(!) PoS (=cost(Nash)/cost(opt)). Yet not minimum Nash: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
 			}
+			cout<<pr<<"  :)  "<<model.get(GRB_DoubleAttr_ObjVal)<<"\n";*/
+
+			int optimstatus2 = model.get(GRB_IntAttr_Status);
+			if (optimstatus2 != GRB_INF_OR_UNBD && optimstatus2 != GRB_INFEASIBLE) {
+				//cout << pr << " obj: " << model.get(GRB_DoubleAttr_ObjVal)<< " bef: " << opt_before << " #0: " <<number_of_zeros << " max: " << maximum << endl;
+				if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
+					rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
+				}	
+			}
+
 			// delete added constr:
 			model.remove(constr2);
 		}
@@ -378,11 +341,6 @@ void rec(int number, const vector<unsigned int>& profileOrder, const unsigned in
 
 			int optimstatus2 = model.get(GRB_IntAttr_Status);
 			if (optimstatus2 != GRB_INF_OR_UNBD && optimstatus2 != GRB_INFEASIBLE) {
-				if(opt_before == model.get(GRB_DoubleAttr_ObjVal)) {
-					profile_path_memory[pr][i][j] = 0;
-					number_of_zeros++;
-				}
-				opt_before = model.get(GRB_DoubleAttr_ObjVal);
 				//cout << pr << " " << model.get(GRB_DoubleAttr_ObjVal) << " " << maximum << endl;
 				if (model.get(GRB_DoubleAttr_ObjVal)>maximum) { //1.574
 					rec(number+1, profileOrder, n_variables, size, mult_paths, model, v_edges, used_profile, which_guy, which_strategy, heavy_profile, maximum, paths, profile_path, one, eps, alternative_paths, learning, profile_path_memory);
